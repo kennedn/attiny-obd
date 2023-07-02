@@ -2,10 +2,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include "USI_TWI_Master.h"
-#include <stdlib.h>
 #include <stdio.h>
-// #include <string.h>
-//#include <inttypes.h>
 
 
 #define ADDRESS 0x27
@@ -90,7 +87,7 @@ int main() {
   write2x4bits_and_pulse(0b00000010, RS_INSR);
   _delay_us(2000); // Home command takes a long time
   char lcd_data[40];
-  snprintf(lcd_data, 41, "%s", "Monkey :)");
+  snprintf(lcd_data, 41, "Temp: %.01f%cC", 86.4f,  '\xdf');
   lcd_print(lcd_data);
 
   return 0;
