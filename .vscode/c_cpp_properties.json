@@ -1,0 +1,37 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceRoot}/**",
+                "${workspaceRoot}",
+                "/usr/local/include",
+                "/usr/lib/avr/include",
+                "/usr/lib/avr/include/avr",
+                "/usr/include",
+                "/usr/include/sys"
+            ],
+            "defines": [
+                "__ATtiny85__"
+            ],
+            "browse": {
+                "path": [
+                    "/usr/local/include",
+                    "/usr/include",
+                    "/usr/lib/avr/include",
+                    "/usr/lib/avr/include/avr",
+                    "/usr/include/sys",
+                    "${workspaceRoot}"
+                ],
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            },
+            "intelliSenseMode": "clang-x64",
+            "compilerPath": "/usr/bin/avr-gcc",
+            "cStandard": "c99",
+            "cppStandard": "c++14",
+            "compilerArgs": []
+        }
+    ],
+    "version": 4
+}
