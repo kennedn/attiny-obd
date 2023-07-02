@@ -30,14 +30,10 @@
 unsigned char USI_TWI_Master_Transfer(unsigned char);
 unsigned char USI_TWI_Master_Stop(void);
 
-union USI_TWI_state {
-	unsigned char errorState; // Can reuse the TWI_state for error states due to that it will not be need if there
-	                          // exists an error.
-	struct {
-		unsigned char addressMode : 1;
-		unsigned char masterWriteDataMode : 1;
-		unsigned char unused : 6;
-	};
+struct USI_TWI_state {
+	unsigned char addressMode : 1;
+	unsigned char masterWriteDataMode : 1;
+	unsigned char unused : 6;
 } USI_TWI_state;
 
 /*---------------------------------------------------------------
@@ -51,21 +47,9 @@ void USI_TWI_Master_Initialise()
 	DDR_USI_CL |= (1 << PIN_USI_SCL); // Enable SCL as output.
 	DDR_USI |= (1 << PIN_USI_SDA); // Enable SDA as output.
 
-	USIDR = 0xFF;                                           // Preload dataregister with "released level" data.
-	USICR = (0 << USISIE) | (0 << USIOIE) |                 // Disable Interrupts.
-	        (1 << USIWM1) | (0 << USIWM0) |                 // Set USI in Two-wire mode.
-	        (1 << USICS1) | (0 << USICS0) | (1 << USICLK) | // Software stobe as counter clock source
-	        (0 << USITC);
-	USISR = (1 << USISIF) | (1 << USIOIF) | (1 << USIPF) | (1 << USIDC) | // Clear flags,
-	        (0x0 << USICNT0);                                             // and reset counter.
-}
-
-/*---------------------------------------------------------------
-Use this function to get hold of the error message from the last transmission
----------------------------------------------------------------*/
-unsigned char USI_TWI_Get_State_Info(void)
-{
-	return (USI_TWI_state.errorState); // Return error state.
+	USIDR = 0xFF; // Preload dataregister with "released level" data.
+	USICR = CTRL_REG_INIT;
+	USISR = STAT_REG_INIT;
 }
 
 /*---------------------------------------------------------------
@@ -90,33 +74,18 @@ unsigned char USI_TWI_Start_Transceiver_With_Data(unsigned char *msg, unsigned c
  parameter that defines if a Stop Condition should be send at the end
  of the transmission.
 ---------------------------------------------------------------*/
-#ifndef __GNUC__
-__x // AVR compiler
-#endif
-    unsigned char
-    USI_TWI_Start_Transceiver_With_Data_Stop(unsigned char *msg, unsigned char msgSize, unsigned char stop)
+unsigned char USI_TWI_Start_Transceiver_With_Data_Stop(unsigned char *msg, unsigned char msgSize, unsigned char stop)
 {
-	unsigned char tempUSISR_8bit = (1 << USISIF) | (1 << USIOIF) | (1 << USIPF) | (1 << USIDC)
-	                               |                 // Prepare register value to: Clear flags, and
-	                               (0x0 << USICNT0); // set USI to shift 8 bits i.e. count 16 clock edges.
-	unsigned char tempUSISR_1bit = (1 << USISIF) | (1 << USIOIF) | (1 << USIPF) | (1 << USIDC)
-	                               |                 // Prepare register value to: Clear flags, and
-	                               (0xE << USICNT0); // set USI to shift 1 bit i.e. count 2 clock edges.
-
-	USI_TWI_state.errorState  = 0;
 	USI_TWI_state.addressMode = 1;
 
-
-	if (!(*msg
-	      & (1 << TWI_READ_BIT))) // The LSB in the address byte determines if is a masterRead or masterWrite operation.
+	if (!(*msg & (1 << TWI_READ_BIT))) // The LSB in the address byte determines if is a masterRead or masterWrite operation.
 	{
 		USI_TWI_state.masterWriteDataMode = 1;
 	}
 
 	/* Release SCL to ensure that (repeated) Start can be performed */
 	PORT_USI_CL |= (1 << PIN_USI_SCL); // Release SCL.
-	while (!(PIN_USI_CL & (1 << PIN_USI_SCL)))
-		; // Verify that SCL becomes high.
+	while (!(PIN_USI_CL & (1 << PIN_USI_SCL))); // Verify that SCL becomes high.
 #ifdef TWI_FAST_MODE
 	DELAY_T4TWI; // Delay for T4TWI if TWI_FAST_MODE
 #else
@@ -129,29 +98,18 @@ __x // AVR compiler
 	PORT_USI_CL &= ~(1 << PIN_USI_SCL); // Pull SCL LOW.
 	PORT_USI |= (1 << PIN_USI_SDA);  // Release SDA.
 
-#ifdef SIGNAL_VERIFY
-	if (!(USISR & (1 << USISIF))) {
-		USI_TWI_state.errorState = USI_TWI_MISSING_START_CON;
-		return 0;
-	}
-#endif
-
 	/*Write address and Read/Write data */
 	do {
 		/* If masterWrite cycle (or inital address tranmission)*/
 		if (USI_TWI_state.addressMode || USI_TWI_state.masterWriteDataMode) {
 			/* Write a byte */
-			PORT_USI_CL &= ~(1 << PIN_USI_SCL);         // Pull SCL LOW.
-			USIDR = *(msg++);                        // Setup data.
-			USI_TWI_Master_Transfer(tempUSISR_8bit); // Send 8 bits on bus.
+			PORT_USI_CL &= ~(1 << PIN_USI_SCL);       // Pull SCL LOW.
+			USIDR = *(msg++);                         // Setup data.
+			USI_TWI_Master_Transfer(COUNTER_8BIT);    // Send 8 bits on bus.
 
 			/* Clock and verify (N)ACK from slave */
 			DDR_USI &= ~(1 << PIN_USI_SDA); // Enable SDA as input.
-			if (USI_TWI_Master_Transfer(tempUSISR_1bit) & (1 << TWI_NACK_BIT)) {
-				if (USI_TWI_state.addressMode)
-					USI_TWI_state.errorState = USI_TWI_NO_ACK_ON_ADDRESS;
-				else
-					USI_TWI_state.errorState = USI_TWI_NO_ACK_ON_DATA;
+			if (USI_TWI_Master_Transfer(COUNTER_1BIT) & (1 << TWI_NACK_BIT)) {
 				return 0;
 			}
 			USI_TWI_state.addressMode = 0; // Only perform address transmission once.
@@ -160,7 +118,7 @@ __x // AVR compiler
 		else {
 			/* Read a data byte */
 			DDR_USI &= ~(1 << PIN_USI_SDA); // Enable SDA as input.
-			*(msg++) = USI_TWI_Master_Transfer(tempUSISR_8bit);
+			*(msg++) = USI_TWI_Master_Transfer(COUNTER_8BIT);
 
 			/* Prepare to generate ACK (or NACK in case of End Of Transmission) */
 			if (msgSize == 1) // If transmission of last byte was performed.
@@ -169,7 +127,7 @@ __x // AVR compiler
 			} else {
 				USIDR = 0x00; // Load ACK. Set data register bit 7 (output for SDA) low.
 			}
-			USI_TWI_Master_Transfer(tempUSISR_1bit); // Generate ACK/NACK.
+			USI_TWI_Master_Transfer(COUNTER_1BIT); // Generate ACK/NACK.
 		}
 	} while (--msgSize); // Until all data sent/received.
 
@@ -186,25 +144,22 @@ __x // AVR compiler
  Data to be sent has to be placed into the USIDR prior to calling
  this function. Data read, will be return'ed from the function.
 ---------------------------------------------------------------*/
-unsigned char USI_TWI_Master_Transfer(unsigned char temp)
+unsigned char USI_TWI_Master_Transfer(unsigned char counter_value)
 {
-	USISR = temp;                                          // Set USISR according to temp.
-	                                                       // Prepare clocking.
-	temp = (0 << USISIE) | (0 << USIOIE) |                 // Interrupts disabled
-	       (1 << USIWM1) | (0 << USIWM0) |                 // Set USI in Two-wire mode.
-	       (1 << USICS1) | (0 << USICS0) | (1 << USICLK) | // Software clock strobe as source.
-	       (1 << USITC);                                   // Toggle Clock Port.
+	USISR = STAT_REG_INIT | counter_value;
+
 	do {
 		DELAY_T2TWI;
-		USICR = temp; // Generate positve SCL edge.
+		USICR = USICR | CTRL_REG_CLK_STROBE | CTRL_REG_CLK_TOGGLE; // Generate positive SCL edge.
 		while (!(PIN_USI_CL & (1 << PIN_USI_SCL)))
 			; // Wait for SCL to go high.
 		DELAY_T4TWI;
-		USICR = temp;                   // Generate negative SCL edge.
+		USICR = USICR | CTRL_REG_CLK_STROBE | CTRL_REG_CLK_TOGGLE; // Generate negative SCL edge.
 	} while (!(USISR & (1 << USIOIF))); // Check for transfer complete.
 
 	DELAY_T2TWI;
-	temp  = USIDR;                 // Read out data.
+	
+	unsigned char temp  = USIDR;   // Read out data.
 	USIDR = 0xFF;                  // Release SDA.
 	DDR_USI |= (1 << PIN_USI_SDA); // Enable SDA as output.
 
@@ -225,13 +180,5 @@ unsigned char USI_TWI_Master_Stop(void)
 	PORT_USI |= (1 << PIN_USI_SDA); // Release SDA.
 	DELAY_T2TWI;
 
-#ifdef SIGNAL_VERIFY
-	if (!(USISR & (1 << USIPF))) {
-		USI_TWI_state.errorState = USI_TWI_MISSING_STOP_CON;
-		return 0;
-	}
-#endif
-
 	return 1;
 }
-

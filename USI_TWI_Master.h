@@ -47,7 +47,7 @@
 #define T4_TWI 4.25                             // >4.0us, + 0.25us
 #endif
 
-// Defines controling code generating
+// Defines controlling code generating
 //#define PARAM_VERIFICATION
 //#define NOISE_TESTING
 #define SIGNAL_VERIFY
@@ -88,12 +88,19 @@
 #define DELAY_T2TWI (_delay_us(T2_TWI))
 #define DELAY_T4TWI (_delay_us(T4_TWI))
 
+#define CTRL_REG_INIT   (0 << USISIE) | (0 << USIOIE) |  /* Disable Interrupts. */ \
+	                    (1 << USIWM1) | (0 << USIWM0) |  /* Set USI in Two-wire mode. */ \
+	                    (1 << USICS1) | (0 << USICS0)    /* Software stobe as counter clock source */
+#define CTRL_REG_CLK_STROBE (1 << USICLK)
+#define CTRL_REG_CLK_TOGGLE (1 << USITC)
 
+#define STAT_REG_INIT   (1 << USISIF) | (1 << USIOIF) | (1 << USIPF) | (1 << USIDC)
+#define COUNTER_8BIT    (0x0 << USICNT0) /* Set 4-bit counter to 0 so that 2 x 8 clock edges occur */
+#define COUNTER_1BIT    (0xE << USICNT0) /* Set 4-bit counter to 14 so that 2 x 1 clock edges occur */
 //********** Prototypes **********//
 
 void USI_TWI_Master_Initialise();
 unsigned char USI_TWI_Start_Transceiver_With_Data_Stop(unsigned char *, unsigned char, unsigned char);
 unsigned char USI_TWI_Start_Transceiver_With_Data(unsigned char *, unsigned char);
-unsigned char USI_TWI_Get_State_Info(void);
 
 #endif

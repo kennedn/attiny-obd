@@ -2,8 +2,9 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include "USI_TWI_Master.h"
-//#include <stdlib.h>
-//#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+// #include <string.h>
 //#include <inttypes.h>
 
 
@@ -23,7 +24,7 @@ void write(uint8_t data) {
   USI_TWI_Start_Transceiver_With_Data(_data, 2);
 }
 
-void pulse_enable(uint8_t data) {
+void pulse_enable_bit(uint8_t data) {
   write(data | EN);
   _delay_us(1);
 
@@ -35,14 +36,14 @@ void write2x4bits_and_pulse(uint8_t data, uint8_t reg_select) {
   for (uint8_t i=0; i < 2; i++) {
     uint8_t _data = (data << (i * 4)) & 0XF0;
     write(_data | reg_select);
-    pulse_enable(_data | reg_select);
+    pulse_enable_bit(_data | reg_select);
   }
 }
 
-void lcd_print(char *data, uint8_t data_length) {
-  for (uint32_t i=0; i < data_length; i++) {
+void lcd_print(const char *data) {
+  do {
     write2x4bits_and_pulse(*(data++), RS_DATA);
-  }
+  } while (*data);
 }
 
 int main() {
@@ -59,18 +60,18 @@ int main() {
 
   // Initialise 8 bit mode, attempt 1
   write(0x03 << 4);
-  pulse_enable(0x03 << 4);
+  pulse_enable_bit(0x03 << 4);
   _delay_us(4500); // wait for more than 4.1ms
 
 
   // Initialise 8 bit mode, attempt 2
   write(0x03 << 4);
-  pulse_enable(0x03 << 4);
+  pulse_enable_bit(0x03 << 4);
   _delay_us(150); // wait for more than 40us
 
   // Initialise 4 bit mode
   write(0x02 << 4);
-  pulse_enable(0x02 << 4);
+  pulse_enable_bit(0x02 << 4);
 
   // Initialise 4 bit mode, 2 line mode, 5 x 8 font
   write2x4bits_and_pulse(0b00101000, RS_INSR);
@@ -88,8 +89,9 @@ int main() {
   // Return home
   write2x4bits_and_pulse(0b00000010, RS_INSR);
   _delay_us(2000); // Home command takes a long time
-
-  lcd_print("Hello world!", 12);
+  char lcd_data[40];
+  snprintf(lcd_data, 41, "%s", "Monkey :)");
+  lcd_print(lcd_data);
 
   return 0;
 }
