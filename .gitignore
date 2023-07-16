@@ -1,4 +1,8 @@
 .Trash-1000
 *.hex
 *.bin
+*.elf
+*.o
+*.swp
 docs/
+rolling_data_retreival
