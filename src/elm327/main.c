@@ -33,7 +33,6 @@ int main(void) {
         USI_UART_Copy_Receive_Buffer(uart_response_buffer, 6);
         USI_UART_Deactivate();
         
-        PORTB ^= _BV(PB4);
         USI_UART_Transmit_CString(uart_response_buffer);
         // } 
         _delay_ms(1000);

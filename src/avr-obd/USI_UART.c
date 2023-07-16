@@ -1,5 +1,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
+
 #include "USI_UART.h"
 
 #define DATA_BITS                 8
@@ -10,15 +11,15 @@
 #define USI_COUNTER_MAX_COUNT     16
 #define USI_COUNTER_SEED_TRANSMIT (USI_COUNTER_MAX_COUNT - HALF_FRAME)
 #define INTERRUPT_STARTUP_DELAY   (0x1b / TIMER_PRESCALER)
-#define TIMER0_SEED               (256 - ((SYSTEM_CLOCK / BAUDRATE) / TIMER_PRESCALER))
+#define TIMER0_SEED               (256 - ((F_CPU / BAUDRATE) / TIMER_PRESCALER))
 
 // The initial timer must overflow at either the 0.5 bit or 1.5 bit mark, this allows sampling to occur in the middle of each bit.
 // A choice must be made based on the system clock and baud, Refer to Table 1. in the AVR307 reference notes
-#if ((( (SYSTEM_CLOCK / BAUDRATE) / TIMER_PRESCALER) * 3/2) > (256 - INTERRUPT_STARTUP_DELAY) )
-#define INITIAL_TIMER0_SEED       (256 - (( (SYSTEM_CLOCK / BAUDRATE) / TIMER_PRESCALER) * 1/2) )
+#if ((( (F_CPU / BAUDRATE) / TIMER_PRESCALER) * 3/2) > (256 - INTERRUPT_STARTUP_DELAY) )
+#define INITIAL_TIMER0_SEED       (256 - (( (F_CPU / BAUDRATE) / TIMER_PRESCALER) * 1/2) )
 #define USI_COUNTER_SEED_RECEIVE  (USI_COUNTER_MAX_COUNT - (START_BIT + DATA_BITS))
 #else
-#define INITIAL_TIMER0_SEED       (256 - (( (SYSTEM_CLOCK / BAUDRATE) / TIMER_PRESCALER) * 3/2) )
+#define INITIAL_TIMER0_SEED       (256 - (( (F_CPU / BAUDRATE) / TIMER_PRESCALER) * 3/2) )
 #define USI_COUNTER_SEED_RECEIVE  (USI_COUNTER_MAX_COUNT - DATA_BITS)
 #endif
 
@@ -181,9 +182,9 @@ unsigned char USI_UART_Receive_Byte(void) {
 // Copies `n` bytes from the UART receive circular buffer to a destination buffer as a null terminated char array.
 // @param buff Pointer to a destination buffer.
 // @param n Number of bytes to be extracted.
-void USI_UART_Copy_Receive_Buffer(char *buff, uint8_t n) {
+void USI_UART_Copy_Receive_Buffer(char *buff, unsigned char n) {
     do {
-        uint8_t buff_index = (UART_RxHead + UART_RX_BUFFER_SIZE - n) & UART_RX_BUFFER_MASK;
+        unsigned char buff_index = (UART_RxHead + UART_RX_BUFFER_SIZE - n) & UART_RX_BUFFER_MASK;
         char c = Bit_Reverse(UART_RxBuf[buff_index]);
         if (c != '\r') {
             *(buff++) = c;
@@ -197,7 +198,7 @@ unsigned char USI_UART_Data_In_Receive_Buffer(void) {
     return (UART_RxHead != UART_RxTail);                        // Return 0 (FALSE) if the receive buffer is empty.
 }
 
-void USI_UART_Receive_Enable(uint8_t enable) {
+void USI_UART_Receive_Enable(unsigned char enable) {
     USI_UART_status.receive_Enable = enable;
 }
 

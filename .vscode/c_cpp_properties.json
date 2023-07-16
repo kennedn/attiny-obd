@@ -13,7 +13,8 @@
 
             ],
             "defines": [
-                "__AVR_ATtiny85__"
+                "__AVR_ATtiny85__",
+                "F_CPU=8000000"
             ],
             "browse": {
                 "path": [
@@ -27,7 +28,7 @@
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""
             },
-            "intelliSenseMode": "gcc-x64",
+            "intelliSenseMode": "clang-x64",
             "compilerPath": "/usr/bin/avr-gcc",
             "cStandard": "c99",
             "cppStandard": "c++14",
