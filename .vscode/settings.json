@@ -3,7 +3,9 @@
         "io.h": "c",
         "stdint.h": "c",
         "usi_twi_master.h": "c",
-        "elm327.h": "c"
+        "elm327.h": "c",
+        "lcd1602.h": "c",
+        "usi_uart.h": "c"
     },
     "cSpell.enabled": false
 }

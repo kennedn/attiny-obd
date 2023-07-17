@@ -185,7 +185,7 @@ unsigned char USI_UART_Receive_Byte(void) {
 void USI_UART_Copy_Receive_Buffer(char *buff, unsigned char n) {
     do {
         unsigned char buff_index = (UART_RxHead + UART_RX_BUFFER_SIZE - n) & UART_RX_BUFFER_MASK;
-        char c = Bit_Reverse(UART_RxBuf[buff_index]);
+        unsigned char c = Bit_Reverse(UART_RxBuf[buff_index]);
         if (c != '\r') {
             *(buff++) = c;
         }

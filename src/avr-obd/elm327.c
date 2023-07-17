@@ -8,12 +8,11 @@
 void elm327_initalise(void) {
     USI_UART_Initialise_Receiver();
     sei();	                                                // Enable global interrupts
-	DDRB  |= _BV(PB2);                                      // Configure PB2 (SCL) as output.
-    PORTB &= ~(_BV(PB2));                                   // Drive PB2 (SCL) low to prevent TWI start condition
 }
 
 void elm327_deactivate(void) {
     USI_UART_Deactivate();
+    cli();
 }
 // Copies n response bytes as a cstring into the elm327 response buffer
 // @param n Number of bytes to retreive

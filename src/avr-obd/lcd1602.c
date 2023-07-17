@@ -17,7 +17,7 @@ void write8bits(unsigned char data) {
     ADDRESS << 1,
     data | BACKLIGHT
   };
-  USI_TWI_Start_Transceiver_With_Data(_data, 2);
+  USI_TWI_Start_Transceiver_With_Data((unsigned char*)_data, 2);
 }
 
 void pulse_enable_bit(unsigned char data) {
@@ -56,6 +56,10 @@ void lcd_clear_display(void) {
 }
 
 void lcd_initialise(void) {
+    USI_TWI_Master_Initialise();
+}
+
+void lcd_initialise_full(void) {
     USI_TWI_Master_Initialise();
 
     _delay_ms(50);
