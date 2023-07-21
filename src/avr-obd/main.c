@@ -43,7 +43,7 @@ int main(void)
             lcd_print_cstring(lcd_text);
             lcd_print_char('\xdf');
             lcd_print_char('C');
-            lcd_print_cstring("   ");
+            lcd_print_cstring("    ");
         }
         _delay_ms(500);
     }
