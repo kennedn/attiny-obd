@@ -45,6 +45,21 @@ The following pinout should be followed:
 | GPIO 09 | PB1      |  
 | GPIO 11 | PB2      |  
 
+### Configure the fuses on the device
+
+The following changes need made to the stock fuse configuration for the attiny85 to run `avr-obd`:
+
+- Clock divider bit CKDIV8 unset, this allows the attiny85 to run at 8Mhz
+- Brown-out detection bits BODLEVEL[2:0] set to 4.3v, this prevents the 3.3v TX and RX lines of the ELM327 from  powering the device
+
+The following `avrdude` command will set the correct bits on the fuses:
+
+```bash
+sudo avrdude -p t85 -P /dev/spidev0.0 -c linuxspi -b 30000 -U lfuse:w:0x62:m -U hfuse:w:0xdc:m -U efuse:w:0xff:m
+```
+
+Fuse values calculated using [Fuse Calculator](https://www.engbedded.com/fusecalc/).
+
 ### Run the Makefile
 
 The makefile will build each *.c file under `src/` and then link them, it can also call avrdude to perform the spi copy.
