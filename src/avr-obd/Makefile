@@ -3,6 +3,7 @@ BIN=main
 MCU=attiny85
 AVRDUDEMCU=t85
 CPUFREQ=8000000
+WRITESPEED=30000
 
 CC=avr-gcc
 OBJCOPY=avr-objcopy
@@ -26,9 +27,7 @@ deactivate:
 	sudo gpio -g write 22 0
 
 install: ${BIN}.hex
-	sudo gpio -g mode 22 out
-	sudo gpio -g write 22 0
-	sudo avrdude -p ${AVRDUDEMCU} -P ${PORT} -c linuxspi -b 30000 -U flash:w:${BIN}.hex
+	sudo avrdude -p ${AVRDUDEMCU} -P ${PORT} -c linuxspi -b ${WRITESPEED} -U flash:w:${BIN}.hex
 
 clean:
 	rm -f ${BIN}.elf ${BIN}.hex ${OBJS}
