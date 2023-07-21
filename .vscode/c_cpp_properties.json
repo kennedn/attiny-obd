@@ -5,11 +5,11 @@
             "includePath": [
                 "${workspaceRoot}/**",
                 "${workspaceRoot}",
-                "/usr/local/include",
+                // "/usr/local/include",
                 "/usr/lib/avr/include/**",
                 "/usr/lib/avr/include/avr/**",
-                "/usr/include",
-                "/usr/include/sys"
+                // "/usr/include",
+                // "/usr/include/sys"
 
             ],
             "defines": [
