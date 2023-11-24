@@ -201,22 +201,24 @@ unsigned char USI_UART_Data_In_Receive_Buffer(void) {
 // The pin change interrupt is used to detect USI_UART reception.
 // It is here the USI is configured to sample the UART signal.
 ISR(SIG_PIN_CHANGE) {
-    TCNT0 = INTERRUPT_STARTUP_DELAY + INITIAL_TIMER0_SEED;  // Plant TIMER0 seed to match baudrate (incl interrupt start up time.).
-    TCCR0B = (1 << PSR0) | CLOCK_SOURCE_MASK;               // Reset the prescaler and start Timer0.
-    TIFR = (1 << TOV0);                                     // Clear Timer0 OVF interrupt flag.
-    TIMSK |= (1 << TOIE0);                                  // Enable Timer0 OVF interrupt.
+		if (!( PINB & (1 << PB0) )) {                                   // If the USI DI pin is low, then it is likely the start of a byte
+						TCNT0 = INTERRUPT_STARTUP_DELAY + INITIAL_TIMER0_SEED;  // Plant TIMER0 seed to match baudrate (incl interrupt start up time.).
+						TCCR0B = (1 << PSR0) | CLOCK_SOURCE_MASK;               // Reset the prescaler and start Timer0.
+						TIFR = (1 << TOV0);                                     // Clear Timer0 OVF interrupt flag.
+						TIMSK |= (1 << TOIE0);                                  // Enable Timer0 OVF interrupt.
 
-    USICR = (0 << USISIE) | (1 << USIOIE) |                  // Enable USI Counter OVF interrupt.
-            (0 << USIWM1) | (1 << USIWM0) |                  // Select Three Wire mode.
-            (0 << USICS1) | (1 << USICS0) | (0 << USICLK) |  // Select Timer0 OVER as USI Clock source.
-            (0 << USITC);
-    // Note that enabling the USI will also disable the pin change interrupt.
-    USISR = 0xF0 |                     // Clear all USI interrupt flags.
-            USI_COUNTER_SEED_RECEIVE;  // Preload the USI counter to generate interrupt.
+						USICR = (0 << USISIE) | (1 << USIOIE) |                  // Enable USI Counter OVF interrupt.
+										(0 << USIWM1) | (1 << USIWM0) |                  // Select Three Wire mode.
+										(0 << USICS1) | (1 << USICS0) | (0 << USICLK) |  // Select Timer0 OVER as USI Clock source.
+										(0 << USITC);
+						// Note that enabling the USI will also disable the pin change interrupt.
+						USISR = 0xF0 |                     // Clear all USI interrupt flags.
+										USI_COUNTER_SEED_RECEIVE;  // Preload the USI counter to generate interrupt.
 
-    GIMSK &= ~(1 << PCIE);  // Disable pin change interrupt for PB5:PB0.
+						GIMSK &= ~(1 << PCIE);  // Disable pin change interrupt for PB5:PB0.
 
-    USI_UART_status.ongoing_Reception_Of_Package = TRUE;
+						USI_UART_status.ongoing_Reception_Of_Package = TRUE;
+		}
 }
 
 // The USI Counter Overflow interrupt is used for moving data between memory and the USI data register.
