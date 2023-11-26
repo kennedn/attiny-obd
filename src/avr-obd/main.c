@@ -7,15 +7,8 @@
 #include <stdlib.h>
 
 int main(void) {
-    // Setup USI for TWI communication, initialise display and install icons
     lcd_initialise();
-    _delay_ms(500);
     elm327_initalise();
-
-    char lcd_text[16];
-    //lcd_print_cstring("Coolant ");
-    //lcd_print_char('\1');
-    //lcd_print_char(':');
 
     while (1) {
         elm327_update_data();
@@ -24,12 +17,14 @@ int main(void) {
         lcd_usi_initialise();
 
         lcd_move(0x00);
-        lcd_print_cstring(elm327_command.prefix);
+        lcd_print_cstring(elm327_get_prefix());
+        lcd_print_long(elm327_get_data());
+        lcd_print_cstring(elm327_get_suffix());
 
         lcd_move(0x40);
-        ltoa(elm327_command.data, lcd_text, 10);
-        lcd_print_cstring(lcd_text);
-        lcd_print_cstring(elm327_command.suffix);
+        lcd_print_cstring("Max: ");
+        lcd_print_long(elm327_get_max_data());
+        lcd_print_cstring(elm327_get_suffix());
 
         _delay_ms(500);
         

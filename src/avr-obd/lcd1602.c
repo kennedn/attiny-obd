@@ -1,4 +1,7 @@
 #include "USI_TWI_Master.h"
+#include "lcd1602.h"
+
+#include <stdlib.h>
 
 #define ADDRESS 0x27
 #define BACKLIGHT 0x08
@@ -49,6 +52,12 @@ unsigned char lcd_print_cstring(const char *data) {
 unsigned char lcd_print_char(const char c) {
     write2x4bits_and_pulse(c, RS_DATA);
     return 1;
+}
+
+unsigned char lcd_print_long(long l) {
+    char tmp[MAX_LONG_LEN + 1]; // + 1 for null terminator
+    ltoa(l, tmp, 10);
+    return lcd_print_cstring(tmp);
 }
 
 void lcd_return_home(void) {

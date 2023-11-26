@@ -1,5 +1,6 @@
 
 #include "elm327.h"
+#include "eeprom.h"
 
 #include <avr/interrupt.h>
 #include <avr/io.h>
@@ -11,12 +12,26 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define EEPROM_BASE_MAX_VALUE 0x0
+#define EEPROM_MAX_BASE 0x0
 #define EEPROM_CONFIG 0xFF
 
+char elm327_response_buffer[UART_RX_BUFFER_SIZE];
+
+typedef struct ELM327_Command{
+    char command[8];
+    char prefix[20];
+    char suffix[20];
+    long data;
+    long max_data;
+    unsigned char raw_data;
+    unsigned char raw_max_data;
+    long (*converter)(unsigned char);
+} ELM327_Command;
+
+ELM327_Command elm327_command;
 
 void elm327_send_command_and_wait(char*);
-long elm327_convert_temperature();
+long elm327_convert_temperature(unsigned char);
 
 void elm327_usi_initalise(void) {
     USI_UART_Initialise_Receiver();
@@ -25,8 +40,9 @@ void elm327_usi_initalise(void) {
 
 void elm327_initalise(void) {
     strncpy(elm327_command.command, "01051\r", 16);
-    strncpy(elm327_command.prefix, "Coolant \1" ":      ", 16);
+    strncpy(elm327_command.prefix, "Coolant \1" ": ", 16);
     strncpy(elm327_command.suffix, "\xdf" "C              ", 16);
+    elm327_command.raw_max_data = eeprom_read(EEPROM_MAX_BASE);
     elm327_command.converter = &elm327_convert_temperature;
 
     elm327_send_command_and_wait("ATZ\r");    // Reset
@@ -49,18 +65,44 @@ void elm327_retrieve_cstring(unsigned char n) {
 
 // Converts a temperature string inline by rebasing it to -40
 // @param s Temperature string to rebase inline
-long elm327_convert_temperature() {
-    return strtol(elm327_response_buffer, NULL, 16) - 40;
+long elm327_convert_temperature(unsigned char x) {
+    return (long)x - 40;
 }
 
 void elm327_update_data() {
     elm327_usi_initalise();
+
     elm327_send_command_and_wait(NULL);
     elm327_retrieve_cstring(5);
-    elm327_command.data = elm327_command.converter();
+
+    unsigned char raw_data = (unsigned char)strtol(elm327_response_buffer, NULL, 16);
+    long data = elm327_command.converter(raw_data);
+    elm327_command.raw_data = raw_data;
+    elm327_command.data = data;
+    if (raw_data > elm327_command.raw_max_data) {
+        elm327_command.raw_max_data = raw_data;
+        elm327_command.max_data = data;
+        eeprom_write(EEPROM_MAX_BASE, raw_data);
+    }
+
     elm327_deactivate();
 }
 
+char* elm327_get_prefix(void) {
+    return elm327_command.prefix;
+}
+
+char* elm327_get_suffix(void) {
+    return elm327_command.suffix;
+}
+
+long elm327_get_data(void) {
+    return elm327_command.data;
+}
+
+long elm327_get_max_data(void) {
+    return elm327_command.max_data;
+}
 
 // Transmit a command on the elm327 uart and block until a '>' character is observed
 // @param command Command to send to elm327
