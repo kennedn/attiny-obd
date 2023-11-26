@@ -31,3 +31,6 @@ install: ${BIN}.hex
 
 clean:
 	rm -f ${BIN}.elf ${BIN}.hex ${OBJS}
+
+simulate:
+	./../../tools/elm327_mimic.py
