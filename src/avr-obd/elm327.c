@@ -12,26 +12,59 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define COUNT_OF(x) ((sizeof(x) / sizeof(0 [x])) / ((unsigned char)(!(sizeof(x) % sizeof(0 [x])))))
 #define EEPROM_MAX_BASE 0x0
 #define EEPROM_CONFIG 0xFF
 
 char elm327_response_buffer[UART_RX_BUFFER_SIZE];
 
+void elm327_send_command_and_wait(char*);
+long elm327_unit_temp(long);
+long elm327_unit_percent(long);
+long elm327_unit_kph(long);
+
+
 typedef struct ELM327_Command{
     char command[8];
-    char prefix[20];
-    char suffix[20];
+    char prefix[12];
+    char suffix[5];
     long data;
     long max_data;
-    unsigned char raw_data;
-    unsigned char raw_max_data;
-    long (*converter)(unsigned char);
+    char bytes;
+    long (*unit_func)(long);
 } ELM327_Command;
 
-ELM327_Command elm327_command;
+ELM327_Command elm327_commands[] = {
+    {
+        .command = "01051\r",
+        .prefix = "Coolant \x01" ": ",
+        .suffix = "\xdf" "C",
+        .data = 0,
+        .max_data = 0,
+        .bytes = 2,
+        .unit_func = elm327_unit_temp
+    },
+    {
+        .command = "012F1\r",
+        .prefix = "Fuel Lvl: ",
+        .suffix = "%",
+        .data = 0,
+        .max_data = 0,
+        .bytes = 2,
+        .unit_func = elm327_unit_percent
+    },
+    {
+        .command = "010D1\r",
+        .prefix = "Speed: ",
+        .suffix = " kph",
+        .data = 0,
+        .max_data = 0,
+        .bytes = 2,
+        .unit_func = elm327_unit_kph
+    }
+};
 
-void elm327_send_command_and_wait(char*);
-long elm327_convert_temperature(unsigned char);
+unsigned char elm327_idx = 2;
 
 void elm327_usi_initalise(void) {
     USI_UART_Initialise_Receiver();
@@ -39,12 +72,6 @@ void elm327_usi_initalise(void) {
 }
 
 void elm327_initalise(void) {
-    strncpy(elm327_command.command, "01051\r", 16);
-    strncpy(elm327_command.prefix, "Coolant \1" ": ", 16);
-    strncpy(elm327_command.suffix, "\xdf" "C              ", 16);
-    elm327_command.raw_max_data = eeprom_read(EEPROM_MAX_BASE);
-    elm327_command.converter = &elm327_convert_temperature;
-
     elm327_send_command_and_wait("ATZ\r");    // Reset
     elm327_send_command_and_wait("ATE0\r");   // Echo off
     elm327_send_command_and_wait("ATTP6\r");  // Select protocol 6
@@ -63,52 +90,69 @@ void elm327_retrieve_cstring(unsigned char n) {
     USI_UART_Copy_Receive_Buffer(elm327_response_buffer, n);
 }
 
-// Converts a temperature string inline by rebasing it to -40
-// @param s Temperature string to rebase inline
-long elm327_convert_temperature(unsigned char x) {
+long elm327_unit_temp(long x) {
     return (long)x - 40;
+}
+
+long elm327_unit_percent(long x) {
+    return (long)((x * 100 + 128) >> 8);
+}
+
+long elm327_unit_kph(long x) {
+    return (long)x;
 }
 
 void elm327_update_data() {
     elm327_usi_initalise();
 
     elm327_send_command_and_wait(NULL);
-    elm327_retrieve_cstring(5);
+    // Required bytes + \x20 \xOD \xOD
+    elm327_retrieve_cstring(elm327_commands[elm327_idx].bytes + 3);
 
-    unsigned char raw_data = (unsigned char)strtol(elm327_response_buffer, NULL, 16);
-    long data = elm327_command.converter(raw_data);
-    elm327_command.raw_data = raw_data;
-    elm327_command.data = data;
-    if (raw_data > elm327_command.raw_max_data) {
-        elm327_command.raw_max_data = raw_data;
-        elm327_command.max_data = data;
-        eeprom_write(EEPROM_MAX_BASE, raw_data);
+    long raw_data = strtol(elm327_response_buffer, NULL, 16);
+    long data = elm327_commands[elm327_idx].unit_func(raw_data);
+    elm327_commands[elm327_idx].data = data;
+    if (data > elm327_commands[elm327_idx].max_data) {
+        elm327_commands[elm327_idx].max_data = data;
+        eeprom_write(EEPROM_MAX_BASE, data);
     }
 
     elm327_deactivate();
 }
 
 char* elm327_get_prefix(void) {
-    return elm327_command.prefix;
+    return elm327_commands[elm327_idx].prefix;
 }
 
 char* elm327_get_suffix(void) {
-    return elm327_command.suffix;
+    return elm327_commands[elm327_idx].suffix;
 }
 
 long elm327_get_data(void) {
-    return elm327_command.data;
+    return elm327_commands[elm327_idx].data;
 }
 
 long elm327_get_max_data(void) {
-    return elm327_command.max_data;
+    return elm327_commands[elm327_idx].max_data;
+}
+
+void elm327_next_command(void) {
+    elm327_idx = (elm327_idx + 1) % COUNT_OF(elm327_commands);
+    //elm327_idx = (elm327_idx + 1) % 3;
+    //elm327_idx = 0;
+}
+
+void elm327_previous_command(void) {
+    elm327_idx = (elm327_idx + COUNT_OF(elm327_commands) - 1) % COUNT_OF(elm327_commands);
+    //elm327_idx = (elm327_idx + 3 - 1) % 3;
+    //elm327_idx = 2;
 }
 
 // Transmit a command on the elm327 uart and block until a '>' character is observed
 // @param command Command to send to elm327
 void elm327_send_command_and_wait(char *s) {
     if (s == NULL) { 
-        USI_UART_Transmit_CString(elm327_command.command);
+        USI_UART_Transmit_CString(elm327_commands[elm327_idx].command);
     } else {
         USI_UART_Transmit_CString(s);
     }
