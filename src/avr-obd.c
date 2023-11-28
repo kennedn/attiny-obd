@@ -1,8 +1,8 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
-#include "elm327.h"
-#include "lcd1602.h"
+#include "lib/elm327.h"
+#include "lib/lcd1602.h"
 
 #include <stdlib.h>
 #define LEFT_PIN PB4

@@ -5,4 +5,5 @@
 *.o
 *.swp
 docs/
+build/
 rolling_data_retreival
