@@ -71,17 +71,15 @@ static volatile union USI_UART_status {
     };
 } USI_UART_status = {0};
 
-// Reverses the order of bits in a byte in O(1) using a pre-processor defined lookup-table.
-#define R2(n) n, n + 2 * 64, n + 1 * 64, n + 3 * 64
-#define R4(n) R2(n), R2(n + 2 * 16), R2(n + 1 * 16), R2(n + 3 * 16)
-#define R6(n) R4(n), R4(n + 2 * 4), R4(n + 1 * 4), R4(n + 3 * 4)
-
-static const unsigned char BitReverseTable256[256] = {
-    R6(0), R6(2), R6(1), R6(3)};
-
 unsigned char Bit_Reverse(unsigned char x) {
-    return BitReverseTable256[x];
+    unsigned char result = 0;
+    for (int i = 0; i < 8; ++i) {
+        result = (result << 1) | (x & 1);
+        x >>= 1;
+    }
+    return result;
 }
+
 
 // Flush the UART buffers.
 void USI_UART_Flush_Buffers(void) {

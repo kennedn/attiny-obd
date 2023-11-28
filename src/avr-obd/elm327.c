@@ -4,6 +4,7 @@
 
 #include <avr/interrupt.h>
 #include <avr/io.h>
+#include <avr/pgmspace.h>
 #include <util/delay.h>
 
 #include "USI_UART.h"
@@ -12,53 +13,64 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define COUNT_OF(x) ((sizeof(x) / sizeof(0 [x])) / ((unsigned char)(!(sizeof(x) % sizeof(0 [x])))))
 #define EEPROM_MAX_BASE 0x0
 #define EEPROM_CONFIG 0xFF
+#define ELM327_COMMAND_COUNT 3
 
 char elm327_response_buffer[UART_RX_BUFFER_SIZE];
 
-void elm327_send_command_and_wait(char*);
+void elm327_send_command_and_wait(const char*);
 long elm327_unit_temp(long);
 long elm327_unit_percent(long);
 long elm327_unit_kph(long);
+long elm327_comp_max(long, long);
+long elm327_comp_min(long, long);
 
+long elm327_data;
+long elm327_eeprom_data;
+
+const char flash_command1[] PROGMEM = "01051\r";
+const char flash_prefix1[] PROGMEM = "Coolant \x01" ": ";
+const char flash_suffix1[] PROGMEM = "\xdf" "C";
+const char flash_command2[] PROGMEM = "012F1\r";
+const char flash_prefix2[] PROGMEM = "Fuel Lvl: ";
+const char flash_suffix2[] PROGMEM = "%";
+const char flash_command3[] PROGMEM = "010D1\r";
+const char flash_prefix3[] PROGMEM = "Speed: ";
+const char flash_suffix3[] PROGMEM = " kph";
+
+const char flash_command4[] PROGMEM = "ATZ\r";
+const char flash_command5[] PROGMEM = "ATE0\r";
+const char flash_command6[] PROGMEM = "ATTP6\r";
 
 typedef struct ELM327_Command{
-    char command[8];
-    char prefix[12];
-    char suffix[5];
-    long data;
-    long max_data;
+    const char *command;
+    const char *prefix;
+    const char *suffix;
     char bytes;
     long (*unit_func)(long);
+    char (*comp_func)(long, long);
 } ELM327_Command;
 
 ELM327_Command elm327_commands[] = {
     {
-        .command = "01051\r",
-        .prefix = "Coolant \x01" ": ",
-        .suffix = "\xdf" "C",
-        .data = 0,
-        .max_data = 0,
+        .command = flash_command1,
+        .prefix = flash_prefix1,
+        .suffix = flash_suffix1,
         .bytes = 2,
         .unit_func = elm327_unit_temp
     },
     {
-        .command = "012F1\r",
-        .prefix = "Fuel Lvl: ",
-        .suffix = "%",
-        .data = 0,
-        .max_data = 0,
+        .command = flash_command2,
+        .prefix = flash_prefix2,
+        .suffix = flash_suffix2,
         .bytes = 2,
         .unit_func = elm327_unit_percent
     },
     {
-        .command = "010D1\r",
-        .prefix = "Speed: ",
-        .suffix = " kph",
-        .data = 0,
-        .max_data = 0,
+        .command = flash_command3,
+        .prefix = flash_prefix3,
+        .suffix = flash_suffix3,
         .bytes = 2,
         .unit_func = elm327_unit_kph
     }
@@ -72,9 +84,9 @@ void elm327_usi_initalise(void) {
 }
 
 void elm327_initalise(void) {
-    elm327_send_command_and_wait("ATZ\r");    // Reset
-    elm327_send_command_and_wait("ATE0\r");   // Echo off
-    elm327_send_command_and_wait("ATTP6\r");  // Select protocol 6
+    elm327_send_command_and_wait(flash_command4);    // Reset
+    elm327_send_command_and_wait(flash_command5);   // Echo off
+    elm327_send_command_and_wait(flash_command6);  // Select protocol 6
     USI_UART_Initialise_Receiver();
     sei();  // Enable global interrupts
 }
@@ -102,6 +114,14 @@ long elm327_unit_kph(long x) {
     return (long)x;
 }
 
+long elm327_comp_max(long d1, long d2) {
+    return d1 > d2;
+}
+
+long elm327_comp_min(long d1, long d2) {
+    return d1 < d2;
+}
+
 void elm327_update_data() {
     elm327_usi_initalise();
 
@@ -111,50 +131,49 @@ void elm327_update_data() {
 
     long raw_data = strtol(elm327_response_buffer, NULL, 16);
     long data = elm327_commands[elm327_idx].unit_func(raw_data);
-    elm327_commands[elm327_idx].data = data;
-    if (data > elm327_commands[elm327_idx].max_data) {
-        elm327_commands[elm327_idx].max_data = data;
+    elm327_data = data;
+    if (data > elm327_eeprom_data) {
+        elm327_eeprom_data = data;
         eeprom_write(EEPROM_MAX_BASE, data);
     }
 
     elm327_deactivate();
 }
 
-char* elm327_get_prefix(void) {
+const char* elm327_get_prefix(void) {
     return elm327_commands[elm327_idx].prefix;
 }
 
-char* elm327_get_suffix(void) {
+const char* elm327_get_suffix(void) {
     return elm327_commands[elm327_idx].suffix;
 }
 
 long elm327_get_data(void) {
-    return elm327_commands[elm327_idx].data;
+    return elm327_data;
 }
 
-long elm327_get_max_data(void) {
-    return elm327_commands[elm327_idx].max_data;
+long elm327_get_eeprom_data(void) {
+    return elm327_eeprom_data;
 }
 
 void elm327_next_command(void) {
-    elm327_idx = (elm327_idx + 1) % COUNT_OF(elm327_commands);
-    //elm327_idx = (elm327_idx + 1) % 3;
-    //elm327_idx = 0;
+    elm327_idx = (elm327_idx + 1) % ELM327_COMMAND_COUNT;
 }
 
 void elm327_previous_command(void) {
-    elm327_idx = (elm327_idx + COUNT_OF(elm327_commands) - 1) % COUNT_OF(elm327_commands);
-    //elm327_idx = (elm327_idx + 3 - 1) % 3;
-    //elm327_idx = 2;
+    elm327_idx = (elm327_idx + ELM327_COMMAND_COUNT - 1) % ELM327_COMMAND_COUNT;
 }
 
 // Transmit a command on the elm327 uart and block until a '>' character is observed
 // @param command Command to send to elm327
-void elm327_send_command_and_wait(char *s) {
+void elm327_send_command_and_wait(const char *s) {
+    char buffer[20];
     if (s == NULL) { 
-        USI_UART_Transmit_CString(elm327_commands[elm327_idx].command);
-    } else {
-        USI_UART_Transmit_CString(s);
+        s = elm327_commands[elm327_idx].command;
+    } 
+    if (s != NULL) {
+        strcpy_P(buffer, s);
+        USI_UART_Transmit_CString(buffer);
     }
     while (USI_UART_Receive_Byte() != '>');
 }

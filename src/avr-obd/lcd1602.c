@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 
+#include <avr/pgmspace.h>
+
 #define ADDRESS 0x27
 #define BACKLIGHT 0x08
 
@@ -41,11 +43,14 @@ void write2x4bits_and_pulse(unsigned char data, unsigned char reg_select) {
 }
 
 unsigned char lcd_print_cstring(const char *data) {
+    char buffer[20];
+    char *ptr = (char*)buffer;
+    strcpy_P(buffer, data);
     unsigned char i = 0;
     do {
-        write2x4bits_and_pulse(*(data++), RS_DATA);
+        write2x4bits_and_pulse(*(ptr++), RS_DATA);
         i++;
-    } while (*data);
+    } while (*ptr);
     return i;
 }
 
@@ -55,9 +60,15 @@ unsigned char lcd_print_char(const char c) {
 }
 
 unsigned char lcd_print_long(long l) {
-    char tmp[MAX_LONG_LEN + 1]; // + 1 for null terminator
+    char tmp[MAX_LONG_LEN];
+    char *ptr = (char*)tmp;
     ltoa(l, tmp, 10);
-    return lcd_print_cstring(tmp);
+    unsigned char i = 0;
+    do {
+        write2x4bits_and_pulse(*(ptr++), RS_DATA);
+        i++;
+    } while (*ptr);
+    return i;
 }
 
 void lcd_return_home(void) {

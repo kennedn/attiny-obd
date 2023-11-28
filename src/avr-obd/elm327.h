@@ -5,10 +5,10 @@
 void elm327_initalise(void);
 void elm327_update_data(void);
 
-char* elm327_get_prefix(void);
-char* elm327_get_suffix(void);
+const char* elm327_get_prefix(void);
+const char* elm327_get_suffix(void);
 long elm327_get_data(void);
-long elm327_get_max_data(void);
+long elm327_get_eeprom_data(void);
 void elm327_next_command(void);
 void elm327_previous_command(void);
 

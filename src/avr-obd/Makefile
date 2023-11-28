@@ -32,5 +32,9 @@ install: ${BIN}.hex
 clean:
 	rm -f ${BIN}.elf ${BIN}.hex ${OBJS}
 
+size:
+	    avr-size --format=avr --mcu=attiny85 ${BIN}.elf
+
 simulate:
 	./../../tools/elm327_mimic.py
+
