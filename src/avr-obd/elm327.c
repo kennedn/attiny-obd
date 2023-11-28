@@ -16,6 +16,7 @@
 #define EEPROM_MAX_BASE 0x0
 #define EEPROM_CONFIG 0xFF
 #define ELM327_COMMAND_COUNT 3
+#define ELM327_RECEIVE_TIMEOUT WDTO_250MS
 
 char elm327_response_buffer[UART_RX_BUFFER_SIZE];
 
@@ -175,6 +176,7 @@ void elm327_send_command_and_wait(const char *s) {
         strcpy_P(buffer, s);
         USI_UART_Transmit_CString(buffer);
     }
+
     while (USI_UART_Receive_Byte() != '>');
 }
 

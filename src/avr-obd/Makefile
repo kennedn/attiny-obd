@@ -12,6 +12,9 @@ SOURCES=$(wildcard *.c)
 OBJS=$(SOURCES:.c=.o)
 PORT=/dev/spidev0.0
 
+EEPROM_ERASE_COUNT=3
+EEPROM_ERASE_STRING=$$(printf '0x00,%.0s' $$(seq 1 $(EEPROM_ERASE_COUNT)))
+
 ${BIN}.hex: ${BIN}.elf
 	${OBJCOPY} -O ihex $< $@
 
@@ -26,8 +29,8 @@ deactivate:
 	sudo gpio -g mode 22 out
 	sudo gpio -g write 22 0
 
-install: ${BIN}.hex
-	sudo avrdude -p ${AVRDUDEMCU} -P ${PORT} -c linuxspi -b ${WRITESPEED} -U flash:w:${BIN}.hex
+install: ${BIN}.hex size
+	sudo avrdude -p ${AVRDUDEMCU} -P ${PORT} -c linuxspi -b ${WRITESPEED} -U flash:w:${BIN}.hex -U eeprom:w:$(EEPROM_ERASE_STRING):m
 
 clean:
 	rm -f ${BIN}.elf ${BIN}.hex ${OBJS}

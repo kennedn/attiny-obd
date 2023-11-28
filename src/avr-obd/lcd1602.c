@@ -54,9 +54,13 @@ unsigned char lcd_print_cstring(const char *data) {
     return i;
 }
 
-unsigned char lcd_print_char(const char c) {
-    write2x4bits_and_pulse(c, RS_DATA);
-    return 1;
+unsigned char lcd_print_padding(unsigned char count) {
+    unsigned char i = 0;
+    do {
+        write2x4bits_and_pulse(' ', RS_DATA);
+        i++;
+    } while(--count);
+    return i;
 }
 
 unsigned char lcd_print_long(long l) {

@@ -143,7 +143,7 @@ void USI_UART_Transmit_Byte(unsigned char data) {
 
     tmphead = (UART_TxHead + 1) & UART_TX_BUFFER_MASK;  // Calculate buffer index.
     while (tmphead == UART_TxTail)
-        ;                                     // Wait for free space in buffer.
+        ;                                     // Wait for free space in transmit buffer (a transfer is on-going).
     UART_TxBuf[tmphead] = Bit_Reverse(data);  // Reverse the order of the bits in the data byte and store data in buffer.
     UART_TxHead = tmphead;                    // Store new index.
 
@@ -170,8 +170,10 @@ unsigned char USI_UART_Data_Transmitting(void) {
 unsigned char USI_UART_Receive_Byte(void) {
     unsigned char tmptail;
 
-    while (UART_RxHead == UART_RxTail)
-        ;                                               // Wait for incoming data
+    if (UART_RxHead == UART_RxTail) {                   // No data in receive buffer
+        return '\0';
+    }
+
     tmptail = (UART_RxTail + 1) & UART_RX_BUFFER_MASK;  // Calculate buffer index
     UART_RxTail = tmptail;                              // Store new index
     return Bit_Reverse(UART_RxBuf[tmptail]);            // Reverse the order of the bits in the data byte before it returns data from the buffer.
