@@ -1,6 +1,6 @@
 
 #include "elm327.h"
-#include "eeprom.h"
+#include "storage.h"
 
 #include <avr/interrupt.h>
 #include <avr/io.h>
@@ -24,60 +24,58 @@ void elm327_send_command_and_wait(const char*);
 long elm327_unit_temp(long);
 long elm327_unit_percent(long);
 long elm327_unit_kph(long);
-long elm327_comp_max(long, long);
-long elm327_comp_min(long, long);
+char elm327_comp_max(long, long);
+char elm327_comp_min(long, long);
+void elm327_retrieve_stored_data(void);
 
 long elm327_data;
-long elm327_eeprom_data;
-
-const char flash_command1[] PROGMEM = "01051\r";
-const char flash_prefix1[] PROGMEM = "Coolant \x01" ": ";
-const char flash_suffix1[] PROGMEM = "\xdf" "C";
-const char flash_command2[] PROGMEM = "012F1\r";
-const char flash_prefix2[] PROGMEM = "Fuel Lvl: ";
-const char flash_suffix2[] PROGMEM = "%";
-const char flash_command3[] PROGMEM = "010D1\r";
-const char flash_prefix3[] PROGMEM = "Speed: ";
-const char flash_suffix3[] PROGMEM = " kph";
-
-const char flash_command4[] PROGMEM = "ATZ\r";
-const char flash_command5[] PROGMEM = "ATE0\r";
-const char flash_command6[] PROGMEM = "ATTP6\r";
+long elm327_stored_data;
 
 typedef struct ELM327_Command{
     const char *command;
     const char *prefix;
     const char *suffix;
+    const char *stored_prefix;
     char bytes;
+    long default_data;
     long (*unit_func)(long);
     char (*comp_func)(long, long);
 } ELM327_Command;
 
 ELM327_Command elm327_commands[] = {
     {
-        .command = flash_command1,
-        .prefix = flash_prefix1,
-        .suffix = flash_suffix1,
+        .command = storage_command_0,
+        .prefix = storage_prefix_0,
+        .suffix = storage_suffix_0,
+        .stored_prefix = storage_stored_prefix_0,
         .bytes = 2,
-        .unit_func = elm327_unit_temp
+        .default_data = 0,
+        .unit_func = elm327_unit_temp,
+        .comp_func = elm327_comp_max
     },
     {
-        .command = flash_command2,
-        .prefix = flash_prefix2,
-        .suffix = flash_suffix2,
+        .command = storage_command_1,
+        .prefix = storage_prefix_1,
+        .suffix = storage_suffix_1,
+        .stored_prefix = storage_stored_prefix_1,
         .bytes = 2,
-        .unit_func = elm327_unit_percent
+        .default_data = 255,
+        .unit_func = elm327_unit_percent,
+        .comp_func = elm327_comp_min
     },
     {
-        .command = flash_command3,
-        .prefix = flash_prefix3,
-        .suffix = flash_suffix3,
+        .command = storage_command_2,
+        .prefix = storage_prefix_2,
+        .suffix = storage_suffix_2,
+        .stored_prefix = storage_stored_prefix_2,
         .bytes = 2,
-        .unit_func = elm327_unit_kph
+        .default_data = 0,
+        .unit_func = elm327_unit_kph,
+        .comp_func = elm327_comp_max
     }
 };
 
-unsigned char elm327_idx = 2;
+unsigned char elm327_idx;
 
 void elm327_usi_initalise(void) {
     USI_UART_Initialise_Receiver();
@@ -85,10 +83,12 @@ void elm327_usi_initalise(void) {
 }
 
 void elm327_initalise(void) {
-    elm327_send_command_and_wait(flash_command4);    // Reset
-    elm327_send_command_and_wait(flash_command5);   // Echo off
-    elm327_send_command_and_wait(flash_command6);  // Select protocol 6
+    elm327_send_command_and_wait(storage_command_a);    // Reset
+    elm327_send_command_and_wait(storage_command_b);   // Echo off
+    elm327_send_command_and_wait(storage_command_c);  // Select protocol 6
     USI_UART_Initialise_Receiver();
+    elm327_idx = 0;
+    elm327_retrieve_stored_data();
     sei();  // Enable global interrupts
 }
 
@@ -115,11 +115,11 @@ long elm327_unit_kph(long x) {
     return (long)x;
 }
 
-long elm327_comp_max(long d1, long d2) {
+char elm327_comp_max(long d1, long d2) {
     return d1 > d2;
 }
 
-long elm327_comp_min(long d1, long d2) {
+char elm327_comp_min(long d1, long d2) {
     return d1 < d2;
 }
 
@@ -133,9 +133,9 @@ void elm327_update_data() {
     long raw_data = strtol(elm327_response_buffer, NULL, 16);
     long data = elm327_commands[elm327_idx].unit_func(raw_data);
     elm327_data = data;
-    if (data > elm327_eeprom_data) {
-        elm327_eeprom_data = data;
-        eeprom_write(EEPROM_MAX_BASE, data);
+    if (elm327_commands[elm327_idx].comp_func(elm327_data, elm327_stored_data)) {
+        elm327_stored_data = data;
+        storage_write_long(elm327_idx, data);
     }
 
     elm327_deactivate();
@@ -143,6 +143,10 @@ void elm327_update_data() {
 
 const char* elm327_get_prefix(void) {
     return elm327_commands[elm327_idx].prefix;
+}
+
+const char* elm327_get_stored_prefix(void) {
+    return elm327_commands[elm327_idx].stored_prefix;
 }
 
 const char* elm327_get_suffix(void) {
@@ -153,29 +157,41 @@ long elm327_get_data(void) {
     return elm327_data;
 }
 
-long elm327_get_eeprom_data(void) {
-    return elm327_eeprom_data;
+long elm327_get_stored_data(void) {
+    return elm327_stored_data;
+}
+
+void elm327_retrieve_stored_data(void) {
+    long tmp = storage_read_long(elm327_idx);
+    if (tmp == 0xFFFFFFFF) {
+        elm327_stored_data = elm327_commands[elm327_idx].default_data;
+    } else {
+        elm327_stored_data = tmp;
+    }
 }
 
 void elm327_next_command(void) {
     elm327_idx = (elm327_idx + 1) % ELM327_COMMAND_COUNT;
+    elm327_retrieve_stored_data();
 }
 
 void elm327_previous_command(void) {
     elm327_idx = (elm327_idx + ELM327_COMMAND_COUNT - 1) % ELM327_COMMAND_COUNT;
+    elm327_retrieve_stored_data();
 }
 
 // Transmit a command on the elm327 uart and block until a '>' character is observed
 // @param command Command to send to elm327
-void elm327_send_command_and_wait(const char *s) {
-    char buffer[20];
-    if (s == NULL) { 
-        s = elm327_commands[elm327_idx].command;
+void elm327_send_command_and_wait(const char *ptr) {
+    if (ptr == NULL) { 
+        ptr = elm327_commands[elm327_idx].command;
     } 
-    if (s != NULL) {
-        strcpy_P(buffer, s);
-        USI_UART_Transmit_CString(buffer);
+    if (ptr == NULL) {
+        return;
     }
+
+    storage_load_string(ptr);
+    USI_UART_Transmit_CString(storage_string_buffer);
 
     while (USI_UART_Receive_Byte() != '>');
 }

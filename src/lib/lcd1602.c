@@ -1,5 +1,6 @@
 #include "USI_TWI_Master.h"
 #include "lcd1602.h"
+#include "storage.h"
 
 #include <stdlib.h>
 
@@ -15,9 +16,12 @@
 #define LCD_DATA_MASK 0b00000000
 #define LCD_CGRAM_MASK 0b01000000
 #define LCD_DDRAM_MASK 0b10000000
-#define COUNT_OF(x) ((sizeof(x) / sizeof(0 [x])) / ((unsigned char)(!(sizeof(x) % sizeof(0 [x])))))
 
-static const uint16_t s_lcd_icons[] = {0x4, 0xa, 0xa, 0xe, 0xe, 0x1f, 0x1f, 0xe};  // thermometer
+const char *const lcd_icons[] = {
+    storage_icon_0,
+    storage_icon_1,
+    storage_icon_2
+};
 
 void write8bits(unsigned char data) {
     char _data[2] = {
@@ -42,15 +46,14 @@ void write2x4bits_and_pulse(unsigned char data, unsigned char reg_select) {
     }
 }
 
-unsigned char lcd_print_cstring(const char *data) {
-    char buffer[20];
-    char *ptr = (char*)buffer;
-    strcpy_P(buffer, data);
+unsigned char lcd_print_cstring(const char *ptr) {
+    storage_load_string(ptr);
+    char *_ptr = (char*)storage_string_buffer;
     unsigned char i = 0;
     do {
-        write2x4bits_and_pulse(*(ptr++), RS_DATA);
+        write2x4bits_and_pulse(*(_ptr++), RS_DATA);
         i++;
-    } while (*ptr);
+    } while (*_ptr);
     return i;
 }
 
@@ -64,9 +67,8 @@ unsigned char lcd_print_padding(unsigned char count) {
 }
 
 unsigned char lcd_print_long(long l) {
-    char tmp[MAX_LONG_LEN];
-    char *ptr = (char*)tmp;
-    ltoa(l, tmp, 10);
+    ltoa(l, storage_string_buffer, 10);
+    char *ptr = (char*)storage_string_buffer;
     unsigned char i = 0;
     do {
         write2x4bits_and_pulse(*(ptr++), RS_DATA);
@@ -92,10 +94,14 @@ static void lcd_write_icons() {
     // string functions. Quick hack is to lose a character and just start at offset 8 (\1)
     write2x4bits_and_pulse(LCD_CGRAM_MASK | 8, RS_INSR);
 
-    // Write custom characters to LCD module, AC auto increments on each write
-    for (int i = 0; i < COUNT_OF(s_lcd_icons); i++) {
-        write2x4bits_and_pulse(LCD_DATA_MASK | s_lcd_icons[i], RS_DATA);  // write each line of 5x8 character
+    for (unsigned char i=0; i < STORAGE_COMMAND_ENTRIES; i++) {
+        // Write custom characters to LCD module, AC auto increments on each write
+        storage_load_icon(lcd_icons[i], 8);
+        for (unsigned char j = 0; j < 8; j++) {
+            write2x4bits_and_pulse(LCD_DATA_MASK | storage_string_buffer[j], RS_DATA);  // write each line of 5x8 character
+        }
     }
+
     // Return Home (Sets pointer back to DDRAM)
     lcd_return_home();
 }

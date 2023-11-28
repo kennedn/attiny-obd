@@ -42,8 +42,8 @@ int main(void) {
         lcd_print_padding(6);
 
         lcd_move(0x40);
-        //lcd_print_cstring("Max: ");
-        lcd_print_long(elm327_get_eeprom_data());
+        lcd_print_cstring(elm327_get_stored_prefix());
+        lcd_print_long(elm327_get_stored_data());
         lcd_print_cstring(elm327_get_suffix());
         lcd_print_padding(6);
    
