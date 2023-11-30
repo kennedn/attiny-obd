@@ -5,7 +5,7 @@ AVRDUDEMCU=t85
 CPUFREQ=8000000
 WRITESPEED=30000
 PORT=/dev/spidev0.0
-EEPROM_ERASE_COUNT=16
+EEPROM_ERASE_COUNT=20
 EEPROM_ERASE_STRING=$$(printf '0xFF,%.0s' $$(seq 1 $(EEPROM_ERASE_COUNT)))
 
 CC=avr-gcc
@@ -44,6 +44,9 @@ deactivate:
 
 install: ${BUILD_DIR}/${BIN}.hex size
 	sudo avrdude -p ${AVRDUDEMCU} -P ${PORT} -c linuxspi -b ${WRITESPEED} -U flash:w:${BUILD_DIR}/${BIN}.hex -U eeprom:w:$(EEPROM_ERASE_STRING):m
+
+eeprom:
+	sudo avrdude -p ${AVRDUDEMCU} -P ${PORT} -c linuxspi -b ${WRITESPEED} -U eeprom:w:$(EEPROM_ERASE_STRING):m
 
 clean:
 	@rm -rf ${BUILD_DIR} ${BIN}.elf ${BIN}.hex

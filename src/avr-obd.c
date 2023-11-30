@@ -20,10 +20,42 @@ int main(void) {
        // Check for button press, debounce and break if detected
        while (delay_ms < DELAY_MS) {
             if (!(PINB & _BV(LEFT_PIN))) {  // Left button pressed
-                elm327_previous_command();
+                unsigned int depress_target = delay_ms + 1000;
+                while(1) {
+                    delay_ms++;
+                    _delay_ms(1);
+                    if ((PINB & _BV(LEFT_PIN))) {  // Left button depressed
+                        elm327_previous_command();
+                        break;
+                    }
+                    if (delay_ms < depress_target) {
+                        continue;
+                    }
+                    // Long press detected, perform alt function
+                    elm327_send_alt_command();
+                    // Wait for depression before exiting
+                    while(!(PINB & _BV(LEFT_PIN)));
+                    break;
+                }
                 break;
             } else if (!(PINB & _BV(RIGHT_PIN))) {  // Right button pressed
-                elm327_next_command();
+                unsigned int depress_target = delay_ms + 1000;
+                while(1) {
+                    delay_ms++;
+                    _delay_ms(1);
+                    if ((PINB & _BV(RIGHT_PIN))) {  // Right button depressed
+                        elm327_next_command();
+                        break;
+                    }
+                    if (delay_ms < depress_target) {
+                        continue;
+                    }
+                    // Long press detected, perform alt function
+                    elm327_send_alt_command();
+                    // Wait for depression before exiting
+                    while(!(PINB & _BV(RIGHT_PIN)));
+                    break;
+                }
                 break;
             }
             delay_ms++;
@@ -36,15 +68,15 @@ int main(void) {
         lcd_usi_initialise();
 
         lcd_move(0x00);
-        lcd_print_cstring(elm327_get_prefix());
-        lcd_print_long(elm327_get_data());
-        lcd_print_cstring(elm327_get_suffix());
+        lcd_print_ptr(elm327_get_prefix());
+        lcd_print_cstring(elm327_get_data());
+        lcd_print_ptr(elm327_get_suffix());
         lcd_print_padding(6);
 
         lcd_move(0x40);
-        lcd_print_cstring(elm327_get_stored_prefix());
-        lcd_print_long(elm327_get_stored_data());
-        lcd_print_cstring(elm327_get_suffix());
+        lcd_print_ptr(elm327_get_stored_prefix());
+        lcd_print_cstring(elm327_get_stored_data());
+        lcd_print_ptr(elm327_get_suffix());
         lcd_print_padding(6);
    
         // Delay for any remaining time in the case that a button press broke the prior loop early 

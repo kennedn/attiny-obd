@@ -17,10 +17,13 @@
 #define LCD_CGRAM_MASK 0b01000000
 #define LCD_DDRAM_MASK 0b10000000
 
-const char *const lcd_icons[] = {
+#define LCD_ICON_COUNT 4
+
+const char *const lcd_icons[LCD_ICON_COUNT] = {
     storage_icon_0,
     storage_icon_1,
-    storage_icon_2
+    storage_icon_2,
+    storage_icon_3
 };
 
 void write8bits(unsigned char data) {
@@ -46,15 +49,18 @@ void write2x4bits_and_pulse(unsigned char data, unsigned char reg_select) {
     }
 }
 
-unsigned char lcd_print_cstring(const char *ptr) {
-    storage_load_string(ptr);
-    char *_ptr = (char*)storage_string_buffer;
+unsigned char lcd_print_cstring(const char *s) {
     unsigned char i = 0;
     do {
-        write2x4bits_and_pulse(*(_ptr++), RS_DATA);
+        write2x4bits_and_pulse(*(s++), RS_DATA);
         i++;
-    } while (*_ptr);
+    } while (*s);
     return i;
+}
+
+unsigned char lcd_print_ptr(const char *ptr) {
+    storage_load_string(ptr);
+    return lcd_print_cstring(storage_string_buffer);
 }
 
 unsigned char lcd_print_padding(unsigned char count) {
@@ -63,17 +69,6 @@ unsigned char lcd_print_padding(unsigned char count) {
         write2x4bits_and_pulse(' ', RS_DATA);
         i++;
     } while(--count);
-    return i;
-}
-
-unsigned char lcd_print_long(long l) {
-    ltoa(l, storage_string_buffer, 10);
-    char *ptr = (char*)storage_string_buffer;
-    unsigned char i = 0;
-    do {
-        write2x4bits_and_pulse(*(ptr++), RS_DATA);
-        i++;
-    } while (*ptr);
     return i;
 }
 
@@ -94,7 +89,7 @@ static void lcd_write_icons() {
     // string functions. Quick hack is to lose a character and just start at offset 8 (\1)
     write2x4bits_and_pulse(LCD_CGRAM_MASK | 8, RS_INSR);
 
-    for (unsigned char i=0; i < STORAGE_COMMAND_ENTRIES; i++) {
+    for (unsigned char i=0; i < LCD_ICON_COUNT; i++) {
         // Write custom characters to LCD module, AC auto increments on each write
         storage_load_icon(lcd_icons[i], 8);
         for (unsigned char j = 0; j < 8; j++) {

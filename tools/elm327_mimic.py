@@ -9,8 +9,10 @@ import RPi.GPIO as GPIO
 
 port = '/dev/ttyAMA0'
 baudrate = 38400
-target = random.randint(0, 255)
+target = random.randint(0, 0xFF)
 data = target
+target2 = random.randint(0, 0xFF)
+data2 = target
 last_run_ms = 0
 curr_ms = 0
 wait_ms = 0
@@ -33,13 +35,18 @@ logging.setLogRecordFactory(record_factory)
 def move_data_towards_target(data):
     global target
     if data == target:
-        target = random.randint(0,255)
+        target = random.randint(0,0xFF)
 
     elif data < target:
         data += 1
     else:
         data -= 1
     return data
+
+# def format_data(data, n):
+    # masked_data_string = f'{data & ((1 <<(n*8))-1):0{n*2}x}'
+    # format_data_string = ' '.join(masked_data_string[i:i+2] for i in range(0, len(masked_data_string), 2))
+    # return format_data_string
 
 with serial.Serial(port,baudrate) as ser:
     # Toggle RESET pin on attiny
@@ -66,8 +73,13 @@ with serial.Serial(port,baudrate) as ser:
                 last_run_ms = time() * 1000
                 wait_ms = random.randint(100,3000)
                 data = move_data_towards_target(data)
-            # Set command to a mock elm327 response which includes the data
-            command = '7E8 03 41 05 {:02x} \r\r>'.format(data).encode()
+                data2 = move_data_towards_target(data2)
+            if s.startswith('0102'):
+                # Set command to a mock elm327 response which includes the data
+                command = '7E8 03 41 02 41 {:02x} {:02x} \r\r>'.format(data, data2).encode()
+            else:
+                # Set command to a mock elm327 response which includes the data
+                command = '7E8 03 41 05 {:02x} \r\r>'.format(data).encode()
         logging.info("> {}".format(command.decode().replace('\r','\\r')))
         # Reply to device with command    
         ser.write(command)
