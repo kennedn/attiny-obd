@@ -5,7 +5,11 @@ AVRDUDEMCU=t85
 CPUFREQ=8000000
 WRITESPEED=30000
 PORT=/dev/spidev0.0
-EEPROM_ERASE_COUNT=20
+
+# 5 commands + 2 auxillary EEPROM 'slots' are used in code
+COMMAND_SLOTS=5
+AUXILIARY_SLOTS=2
+EEPROM_ERASE_COUNT=$(shell echo $$((4*($(COMMAND_SLOTS) + $(AUXILIARY_SLOTS)))))
 EEPROM_ERASE_STRING=$$(printf '0xFF,%.0s' $$(seq 1 $(EEPROM_ERASE_COUNT)))
 
 CC=avr-gcc

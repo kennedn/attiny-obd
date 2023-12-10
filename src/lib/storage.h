@@ -1,6 +1,10 @@
 #pragma once
 #include <avr/pgmspace.h>
 
+#define STORAGE_DOT_SLOT 0
+#define STORAGE_IDX_SLOT 1
+#define STORAGE_COMMAND_OFFSET_SLOT 2
+
 extern const char storage_alt_command_0[] PROGMEM;
 extern const char storage_alt_string_0[] PROGMEM;
 

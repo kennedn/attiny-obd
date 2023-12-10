@@ -120,7 +120,7 @@ void elm327_initalise(void) {
     elm327_send_command_and_wait(storage_command_c);  // Select protocol 6
     USI_UART_Initialise_Receiver();
     // Index stored at storage index 0
-    elm327_idx = (unsigned char)storage_read_long(0);
+    elm327_idx = (unsigned char)storage_read_long(STORAGE_IDX_SLOT);
 
     // EEPROM has not been set before, so fallback to idx 0
     if (elm327_idx == 0xFF) {
@@ -214,7 +214,7 @@ void elm327_update_data() {
     if (elm327_commands[elm327_idx].comp_func(elm327_data, elm327_stored_data)) {
         elm327_stored_data = data;
         // Stored slot data starts at idx 1
-        storage_write_long(elm327_idx + 1, data);
+        storage_write_long(STORAGE_COMMAND_OFFSET_SLOT + elm327_idx, data);
     }
 
     elm327_deactivate();
@@ -261,7 +261,7 @@ void elm327_setup_data(void) {
     elm327_stored_data = 0;
 
     // Stored slot data starts at idx 1
-    long tmp = storage_read_long(elm327_idx + 1);
+    long tmp = storage_read_long(STORAGE_COMMAND_OFFSET_SLOT + elm327_idx);
 
     // EEPROM has not been set before, so fallback to default data
     if (tmp == 0xFFFFFFFF) {
@@ -271,7 +271,7 @@ void elm327_setup_data(void) {
     }
 
     // Store idx in eeprom
-    storage_write_long(0, (long)elm327_idx);
+    storage_write_long(STORAGE_IDX_SLOT, (long)elm327_idx);
 }
 
 void elm327_next_command(void) {

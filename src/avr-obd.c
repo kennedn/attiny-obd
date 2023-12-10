@@ -44,11 +44,11 @@ void button_handler(unsigned char pin, void (*callback)(void)) {
 }
 
 int main(void) {
-    long reset_count = storage_read_long(0xFF);
+    long reset_count = storage_read_long(STORAGE_DOT_SLOT);
     if (reset_count == 0xFFFFFFFF) {
        reset_count = 0 ;
     }
-    storage_write_long(0xFF, (reset_count + 1) % 3);
+    storage_write_long(STORAGE_DOT_SLOT, (reset_count + 1) % 3);
     wdt_reset();
     wdt_enable(WDTO_1S);
     lcd_initialise();
