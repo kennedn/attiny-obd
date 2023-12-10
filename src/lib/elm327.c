@@ -15,13 +15,14 @@
 
 #define EEPROM_MAX_BASE 0x0
 #define EEPROM_CONFIG 0xFF
-#define ELM327_COMMAND_COUNT 4
+#define ELM327_COMMAND_COUNT 5
 #define ELM327_RECEIVE_TIMEOUT WDTO_250MS
 
 char elm327_response_buffer[UART_RX_BUFFER_SIZE];
 
 long elm327_unit_temp(long);
 long elm327_unit_percent(long);
+long elm327_unit_div10(long);
 
 char elm327_comp_max(long, long);
 char elm327_comp_min(long, long);
@@ -38,7 +39,6 @@ long elm327_stored_data;
 
 typedef struct ELM327_Command{
     const char *command;
-    const char *alt_command;
     const char *prefix;
     const char *suffix;
     const char *stored_prefix;
@@ -52,7 +52,6 @@ typedef struct ELM327_Command{
 ELM327_Command elm327_commands[] = {
     {
         .command = storage_command_0,
-        .alt_command = NULL,
         .prefix = storage_prefix_0,
         .suffix = storage_suffix_0,
         .stored_prefix = storage_stored_prefix_0,
@@ -64,7 +63,6 @@ ELM327_Command elm327_commands[] = {
     },
     {
         .command = storage_command_1,
-        .alt_command = NULL,
         .prefix = storage_prefix_1,
         .suffix = storage_suffix_1,
         .stored_prefix = storage_stored_prefix_1,
@@ -76,10 +74,9 @@ ELM327_Command elm327_commands[] = {
     },
     {
         .command = storage_command_2,
-        .alt_command = NULL,
         .prefix = storage_prefix_2,
         .suffix = storage_suffix_2,
-        .stored_prefix = storage_stored_prefix_2,
+        .stored_prefix = storage_stored_prefix_0,
         .chars = 2,
         .default_data = 0,
         .print_func = elm327_print_long,
@@ -88,15 +85,25 @@ ELM327_Command elm327_commands[] = {
     },
     {
         .command = storage_command_3,
-        .alt_command = storage_alt_command_0,
         .prefix = storage_prefix_3,
         .suffix = storage_suffix_3,
-        .stored_prefix = storage_stored_prefix_3,
+        .stored_prefix = storage_stored_prefix_2,
         .chars = 5,
         .default_data = 0,
         .print_func = elm327_print_dtc,
         .unit_func = NULL,
         .comp_func = elm327_comp_last
+    },
+    {
+        .command = storage_command_4,
+        .prefix = storage_prefix_4,
+        .suffix = storage_suffix_4,
+        .stored_prefix = storage_stored_prefix_0,
+        .chars = 5,
+        .default_data = 0,
+        .print_func = elm327_print_long,
+        .unit_func = elm327_unit_div10,
+        .comp_func = elm327_comp_max
     }
 };
 
@@ -112,7 +119,13 @@ void elm327_initalise(void) {
     elm327_send_command_and_wait(storage_command_b);   // Echo off
     elm327_send_command_and_wait(storage_command_c);  // Select protocol 6
     USI_UART_Initialise_Receiver();
-    elm327_idx = 0;
+    // Index stored at storage index 0
+    elm327_idx = (unsigned char)storage_read_long(0);
+
+    // EEPROM has not been set before, so fallback to idx 0
+    if (elm327_idx == 0xFF) {
+        elm327_idx = 0;
+    }
     elm327_setup_data();
     sei();  // Enable global interrupts
 }
@@ -132,8 +145,20 @@ long elm327_unit_temp(long x) {
     return (long)x - 40;
 }
 
+// Use fixed point arithmetic to multiply by 100 and divide by 255
+// Rounding is achieved by offsetting the value by 128 
+// Shift by 2^8 (256) to approximate division by 255
 long elm327_unit_percent(long x) {
     return (long)((x * 100 + 128) >> 8);
+}
+
+// Use fixed point arithmetic to divide by 10
+// Each unit is scaled by 6554 = (2^16) / 10
+// Rounding is achieved by offsetting the value by half the scale (2^15)
+// Shift by scale to get divided value
+long elm327_unit_div10(long x) {
+    long ret = (x * 6554) + (1 << 15);
+    return ret >> 16;
 }
 
 char elm327_comp_max(long d1, long d2) {
@@ -149,27 +174,32 @@ char elm327_comp_last(long d1, long d2) {
 }
 
 char* elm327_print_long(long d) {
-    ltoa(d, storage_string_buffer, 10);
-    return storage_string_buffer;
+    ltoa(d, elm327_response_buffer, 10);
+    return elm327_response_buffer;
 }
 
 char* elm327_print_dtc(long d) {
     char systems[] = {'P','C', 'B', 'U'};
-    storage_string_buffer[0] = systems[(d >> 14) & 0x3];
+    elm327_response_buffer[0] = systems[d >> 14];
     // Pad with leading 0 if required
     if ((d & 0x3000) == 0) {
-        storage_string_buffer[1] = '0';
-        ltoa(d & 0x3FFF, &(storage_string_buffer[2]), 16);
+        elm327_response_buffer[1] = '0';
+        ltoa(d & 0x3FFF, &(elm327_response_buffer[2]), 16);
     } else {
-        ltoa(d & 0x3FFF, &(storage_string_buffer[1]), 16);
+        ltoa(d & 0x3FFF, &(elm327_response_buffer[1]), 16);
     }
-    return storage_string_buffer;
+    return elm327_response_buffer;
 }
 
 void elm327_update_data() {
     elm327_usi_initalise();
     elm327_send_command_and_wait(NULL);
     // Retrieve valid alphanumeric characters from the last n bytes of the response data
+    // Example data: 7E8 03 41 05 e1 \r\r
+    // To retrieve a bytes worth of hex code (e1), you need to iterate over 5 chars, which gives us:
+    // e1 \r\r
+    // Spaces and CRs are stripped so the function actually returns:
+    // e1
     elm327_retrieve_cstring(elm327_commands[elm327_idx].chars + 3);
     long raw_data = strtol(elm327_response_buffer, NULL, 16);
 
@@ -183,7 +213,8 @@ void elm327_update_data() {
     elm327_data = data;
     if (elm327_commands[elm327_idx].comp_func(elm327_data, elm327_stored_data)) {
         elm327_stored_data = data;
-        storage_write_long(elm327_idx, data);
+        // Stored slot data starts at idx 1
+        storage_write_long(elm327_idx + 1, data);
     }
 
     elm327_deactivate();
@@ -209,12 +240,18 @@ char* elm327_get_stored_data(void) {
     return elm327_commands[elm327_idx].print_func(elm327_stored_data);
 }
 
+const char* elm327_get_alt_string(void) {
+    return storage_alt_string_0;
+}
+
+
+unsigned char elm327_has_alt(void) {
+    return elm327_idx == 3;
+}
+
 void elm327_send_alt_command(void) {
-    if (elm327_commands[elm327_idx].alt_command == NULL) {
-        return;
-    }
     elm327_usi_initalise();
-    elm327_send_command_and_wait(elm327_commands[elm327_idx].alt_command);
+    elm327_send_command_and_wait(storage_alt_command_0);
     elm327_deactivate();
 }
 
@@ -223,12 +260,18 @@ void elm327_setup_data(void) {
     elm327_data = 0;
     elm327_stored_data = 0;
 
-    long tmp = storage_read_long(elm327_idx);
+    // Stored slot data starts at idx 1
+    long tmp = storage_read_long(elm327_idx + 1);
+
+    // EEPROM has not been set before, so fallback to default data
     if (tmp == 0xFFFFFFFF) {
         elm327_stored_data = elm327_commands[elm327_idx].default_data;
     } else {
         elm327_stored_data = tmp;
     }
+
+    // Store idx in eeprom
+    storage_write_long(0, (long)elm327_idx);
 }
 
 void elm327_next_command(void) {

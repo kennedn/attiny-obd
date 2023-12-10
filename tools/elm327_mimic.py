@@ -58,8 +58,8 @@ with serial.Serial(port,baudrate) as ser:
     while True:
         s = ''
         while True:
-            s += ser.read().decode()
-            if s[-1] == '\r': break
+                s += ser.read().decode()
+                if s[-1] == '\r': break
 
         logging.info("< {}".format(s.replace('\r','\\r')))
         command = b''
@@ -74,7 +74,7 @@ with serial.Serial(port,baudrate) as ser:
                 wait_ms = random.randint(100,3000)
                 data = move_data_towards_target(data)
                 data2 = move_data_towards_target(data2)
-            if s.startswith('0102'):
+            if s.startswith('0102') or s.startswith('0110'):
                 # Set command to a mock elm327 response which includes the data
                 command = '7E8 03 41 02 41 {:02x} {:02x} \r\r>'.format(data, data2).encode()
             else:

@@ -17,13 +17,14 @@
 #define LCD_CGRAM_MASK 0b01000000
 #define LCD_DDRAM_MASK 0b10000000
 
-#define LCD_ICON_COUNT 4
+#define LCD_ICON_COUNT 5
 
 const char *const lcd_icons[LCD_ICON_COUNT] = {
     storage_icon_0,
     storage_icon_1,
     storage_icon_2,
-    storage_icon_3
+    storage_icon_3,
+    storage_icon_4
 };
 
 void write8bits(unsigned char data) {
@@ -72,6 +73,11 @@ unsigned char lcd_print_padding(unsigned char count) {
     return i;
 }
 
+unsigned char lcd_print_char(char c) {
+    write2x4bits_and_pulse(c, RS_DATA);
+    return 1;
+}
+
 void lcd_return_home(void) {
     // Return home
     write2x4bits_and_pulse(0b00000010, RS_INSR);
@@ -114,6 +120,9 @@ void lcd_initialise(void) {
 
     _delay_ms(50);
 
+    // 8 bit mode initialised multiple times to account for the edge case where
+    // 4 bit mode has desynchronised
+
     // Initialise 8 bit mode, attempt 1
     write8bits(0x03 << 4);
     pulse_enable_bit(0x03 << 4);
@@ -122,7 +131,11 @@ void lcd_initialise(void) {
     // Initialise 8 bit mode, attempt 2
     write8bits(0x03 << 4);
     pulse_enable_bit(0x03 << 4);
-    _delay_us(150);  // wait for more than 40us
+    _delay_us(150);  // wait for more than 100us
+
+    // Initialise 8 bit mode, attempt 3
+    write8bits(0x03 << 4);
+    pulse_enable_bit(0x03 << 4);
 
     // Initialise 4 bit mode
     write8bits(0x02 << 4);

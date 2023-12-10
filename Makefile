@@ -48,11 +48,13 @@ install: ${BUILD_DIR}/${BIN}.hex size
 eeprom:
 	sudo avrdude -p ${AVRDUDEMCU} -P ${PORT} -c linuxspi -b ${WRITESPEED} -U eeprom:w:$(EEPROM_ERASE_STRING):m
 
+fuse:
+	sudo avrdude -p ${AVRDUDEMCU} -P ${PORT} -c linuxspi -b ${WRITESPEED} -U lfuse:r:-:i
 clean:
 	@rm -rf ${BUILD_DIR} ${BIN}.elf ${BIN}.hex
 
 size: ${BUILD_DIR}/${BIN}.elf
-	avr-size --format=avr --mcu=attiny85 $<
+	avr-size --format=avr --mcu=${MCU} $<
 
 simulate:
 	./tools/elm327_mimic.py

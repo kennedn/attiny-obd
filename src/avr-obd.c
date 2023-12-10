@@ -1,8 +1,10 @@
 #include <avr/io.h>
 #include <util/delay.h>
+#include <avr/wdt.h>
 
 #include "lib/elm327.h"
 #include "lib/lcd1602.h"
+#include "lib/storage.h"
 
 #include <stdlib.h>
 #define LEFT_PIN PB4
@@ -11,51 +13,63 @@
 
 unsigned int delay_ms = 0;
 
+void button_handler(unsigned char pin, void (*callback)(void)) {
+    unsigned int depress_target = delay_ms + 1000;
+    lcd_usi_initialise();
+    while(1) {
+       wdt_reset();
+        delay_ms++;
+        _delay_ms(1);
+        if ((PINB & _BV(pin))) {  // button depressed
+            callback();
+            break;
+        }
+        if (delay_ms < depress_target) {
+            continue;
+        }
+
+        if (elm327_has_alt()) {
+            lcd_move(0x00);
+            lcd_print_ptr(elm327_get_prefix());
+            lcd_print_ptr(elm327_get_alt_string());
+            elm327_send_alt_command();
+        }
+        // Wait for depression before exiting
+        while(!(PINB & _BV(pin))) {
+            wdt_reset();
+            _delay_ms(1);
+        }
+        break;
+    }
+}
+
 int main(void) {
+    long reset_count = storage_read_long(0xFF);
+    if (reset_count == 0xFFFFFFFF) {
+       reset_count = 0 ;
+    }
+    storage_write_long(0xFF, (reset_count + 1) % 3);
+    wdt_reset();
+    wdt_enable(WDTO_1S);
     lcd_initialise();
+    lcd_move(0x00);
+    lcd_print_cstring("No Data");
+    for (long i=0; i < reset_count + 1; i++) {
+        lcd_print_char('.');
+    }
+
     elm327_initalise();
     PORTB |= _BV(LEFT_PIN) | _BV(RIGHT_PIN); //enable pullup on input buttons
 
     while (1) {
        // Check for button press, debounce and break if detected
+       wdt_reset();
        while (delay_ms < DELAY_MS) {
-            if (!(PINB & _BV(LEFT_PIN))) {  // Left button pressed
-                unsigned int depress_target = delay_ms + 1000;
-                while(1) {
-                    delay_ms++;
-                    _delay_ms(1);
-                    if ((PINB & _BV(LEFT_PIN))) {  // Left button depressed
-                        elm327_previous_command();
-                        break;
-                    }
-                    if (delay_ms < depress_target) {
-                        continue;
-                    }
-                    // Long press detected, perform alt function
-                    elm327_send_alt_command();
-                    // Wait for depression before exiting
-                    while(!(PINB & _BV(LEFT_PIN)));
-                    break;
-                }
+            if (!(PINB & _BV(LEFT_PIN))) {
+                button_handler(LEFT_PIN, elm327_previous_command);
                 break;
-            } else if (!(PINB & _BV(RIGHT_PIN))) {  // Right button pressed
-                unsigned int depress_target = delay_ms + 1000;
-                while(1) {
-                    delay_ms++;
-                    _delay_ms(1);
-                    if ((PINB & _BV(RIGHT_PIN))) {  // Right button depressed
-                        elm327_next_command();
-                        break;
-                    }
-                    if (delay_ms < depress_target) {
-                        continue;
-                    }
-                    // Long press detected, perform alt function
-                    elm327_send_alt_command();
-                    // Wait for depression before exiting
-                    while(!(PINB & _BV(RIGHT_PIN)));
-                    break;
-                }
+            } else if (!(PINB & _BV(RIGHT_PIN))) {
+                button_handler(RIGHT_PIN, elm327_next_command);
                 break;
             }
             delay_ms++;
