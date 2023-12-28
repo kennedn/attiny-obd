@@ -1,7 +1,6 @@
 #pragma once
 #include "USI_UART.h"
 
-
 void elm327_initalise(void);
 void elm327_update_data(void);
 
@@ -18,4 +17,4 @@ void elm327_next_command(void);
 void elm327_previous_command(void);
 
 // Debug
-void elm327_send_command(char *s);
+void elm327_send_command(char* s);

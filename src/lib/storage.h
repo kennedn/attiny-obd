@@ -8,7 +8,6 @@
 extern const char storage_alt_command_0[] PROGMEM;
 extern const char storage_alt_string_0[] PROGMEM;
 
-
 extern const char storage_no_data[] PROGMEM;
 
 extern const char storage_command_a[] PROGMEM;
@@ -47,4 +46,4 @@ char storage_string_buffer[16];
 void storage_write_long(unsigned char, long);
 long storage_read_long(unsigned char);
 void storage_load_string(const char*);
-void storage_load_icon(const char * ptr, size_t size);
+void storage_load_icon(const char* ptr, size_t size);

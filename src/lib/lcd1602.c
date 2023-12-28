@@ -1,10 +1,10 @@
-#include "USI_TWI_Master.h"
 #include "lcd1602.h"
-#include "storage.h"
-
-#include <stdlib.h>
 
 #include <avr/pgmspace.h>
+#include <stdlib.h>
+
+#include "USI_TWI_Master.h"
+#include "storage.h"
 
 #define ADDRESS 0x27
 #define BACKLIGHT 0x08
@@ -24,8 +24,7 @@ const char *const lcd_icons[LCD_ICON_COUNT] = {
     storage_icon_1,
     storage_icon_2,
     storage_icon_3,
-    storage_icon_4
-};
+    storage_icon_4};
 
 void write8bits(unsigned char data) {
     char _data[2] = {
@@ -69,7 +68,7 @@ unsigned char lcd_print_padding(unsigned char count) {
     do {
         write2x4bits_and_pulse(' ', RS_DATA);
         i++;
-    } while(--count);
+    } while (--count);
     return i;
 }
 
@@ -95,7 +94,7 @@ static void lcd_write_icons() {
     // string functions. Quick hack is to lose a character and just start at offset 8 (\1)
     write2x4bits_and_pulse(LCD_CGRAM_MASK | 8, RS_INSR);
 
-    for (unsigned char i=0; i < LCD_ICON_COUNT; i++) {
+    for (unsigned char i = 0; i < LCD_ICON_COUNT; i++) {
         // Write custom characters to LCD module, AC auto increments on each write
         storage_load_icon(lcd_icons[i], 8);
         for (unsigned char j = 0; j < 8; j++) {

@@ -8,5 +8,3 @@ unsigned char lcd_print_char(char c);
 void lcd_return_home(void);
 void lcd_clear_display(void);
 void lcd_move(unsigned char);
-
-#define MAX_LONG_LEN 8

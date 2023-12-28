@@ -80,7 +80,6 @@ unsigned char Bit_Reverse(unsigned char x) {
     return result;
 }
 
-
 // Flush the UART buffers.
 void USI_UART_Flush_Buffers(void) {
     UART_RxTail = 0;
@@ -170,7 +169,7 @@ unsigned char USI_UART_Data_Transmitting(void) {
 unsigned char USI_UART_Receive_Byte(void) {
     unsigned char tmptail;
 
-    if (UART_RxHead == UART_RxTail) {                   // No data in receive buffer
+    if (UART_RxHead == UART_RxTail) {  // No data in receive buffer
         return '\0';
     }
 
@@ -212,7 +211,7 @@ unsigned char USI_UART_Data_In_Receive_Buffer(void) {
 // The pin change interrupt is used to detect USI_UART reception.
 // It is here the USI is configured to sample the UART signal.
 ISR(SIG_PIN_CHANGE) {
-    if (!( PINB & (1 << PB0) )) {                                   // If the USI DI pin is low, then it is likely the start of a byte
+    if (!(PINB & (1 << PB0))) {                                 // If the USI DI pin is low, then it is likely the start of a byte
         TCNT0 = INTERRUPT_STARTUP_DELAY + INITIAL_TIMER0_SEED;  // Plant TIMER0 seed to match baudrate (incl interrupt start up time.).
         TCCR0B = (1 << PSR0) | CLOCK_SOURCE_MASK;               // Reset the prescaler and start Timer0.
         TIFR = (1 << TOV0);                                     // Clear Timer0 OVF interrupt flag.

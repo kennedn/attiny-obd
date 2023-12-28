@@ -46,6 +46,7 @@ def main():
     parser.add_argument("-p", "--port", default='/dev/ttyAMA0', help="Set serial port")
     parser.add_argument("-b", "--baudrate", type=int, default=38400, help="Set baudrate")
     parser.add_argument("-d", "--disconnected", action="store_true", help="Respond as if the car is disconnected")
+    parser.add_argument("-i", "--initial_data", type=int, default=-1, help="Respond as if the car is disconnected")
     args = parser.parse_args()
 
     last_run_ms = 0
@@ -60,9 +61,13 @@ def main():
 
     global targets
     global byte_count
+    datas = []
     for i in range(max_data_bytes):
+        if args.initial_data != -1:
+            datas.append(args.initial_data)
+        else:
+            datas.append(random.randint(0, 0xFF))
         targets.append(random.randint(0, 0xFF))
-    datas = targets[:]
 
     with serial.Serial(args.port,args.baudrate) as ser:
         # Toggle RESET pin on attiny

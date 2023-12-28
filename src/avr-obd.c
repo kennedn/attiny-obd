@@ -1,12 +1,11 @@
 #include <avr/io.h>
-#include <util/delay.h>
 #include <avr/wdt.h>
+#include <stdlib.h>
+#include <util/delay.h>
 
 #include "lib/elm327.h"
 #include "lib/lcd1602.h"
 #include "lib/storage.h"
-
-#include <stdlib.h>
 #define LEFT_PIN PB4
 #define RIGHT_PIN PB3
 #define DELAY_MS 500
@@ -16,8 +15,8 @@ unsigned int delay_ms = 0;
 void button_handler(unsigned char pin, void (*callback)(void)) {
     unsigned int depress_target = delay_ms + 1000;
     lcd_usi_initialise();
-    while(1) {
-       wdt_reset();
+    while (1) {
+        wdt_reset();
         delay_ms++;
         _delay_ms(1);
         if ((PINB & _BV(pin))) {  // button depressed
@@ -35,7 +34,7 @@ void button_handler(unsigned char pin, void (*callback)(void)) {
             elm327_send_alt_command();
         }
         // Wait for depression before exiting
-        while(!(PINB & _BV(pin))) {
+        while (!(PINB & _BV(pin))) {
             wdt_reset();
             _delay_ms(1);
         }
@@ -46,7 +45,7 @@ void button_handler(unsigned char pin, void (*callback)(void)) {
 int main(void) {
     long reset_count = storage_read_long(STORAGE_DOT_SLOT);
     if (reset_count == 0xFFFFFFFF) {
-       reset_count = 0 ;
+        reset_count = 0;
     }
     storage_write_long(STORAGE_DOT_SLOT, (reset_count + 1) % 3);
     wdt_reset();
@@ -54,12 +53,12 @@ int main(void) {
     lcd_initialise();
     lcd_move(0x00);
     lcd_print_ptr(storage_no_data);
-    for (long i=0; i < reset_count + 1; i++) {
+    for (long i = 0; i < reset_count + 1; i++) {
         lcd_print_char('.');
     }
 
     elm327_initalise();
-    PORTB |= _BV(LEFT_PIN) | _BV(RIGHT_PIN); //enable pullup on input buttons
+    PORTB |= _BV(LEFT_PIN) | _BV(RIGHT_PIN);  // enable pullup on input buttons
 
     while (1) {
         wdt_reset();
@@ -77,7 +76,7 @@ int main(void) {
         }
 
         elm327_update_data();
-        
+
         // Setup USI for TWI communication
         lcd_usi_initialise();
 
