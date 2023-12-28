@@ -17,5 +17,5 @@ void USI_UART_Transmit_CString(char*);
 unsigned char USI_UART_Data_Transmitting(void);
 void USI_UART_Receive_Enable(unsigned char);
 unsigned char USI_UART_Receive_Byte(void);
-void USI_UART_Copy_Receive_Buffer(char*, unsigned char);
+unsigned char USI_UART_Copy_Receive_Buffer(char*, unsigned char);
 unsigned char USI_UART_Data_In_Receive_Buffer(void);

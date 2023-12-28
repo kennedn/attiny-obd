@@ -53,7 +53,7 @@ int main(void) {
     wdt_enable(WDTO_1S);
     lcd_initialise();
     lcd_move(0x00);
-    lcd_print_cstring("No Data");
+    lcd_print_ptr(storage_no_data);
     for (long i=0; i < reset_count + 1; i++) {
         lcd_print_char('.');
     }
@@ -63,7 +63,6 @@ int main(void) {
 
     while (1) {
        // Check for button press, debounce and break if detected
-       wdt_reset();
        while (delay_ms < DELAY_MS) {
             if (!(PINB & _BV(LEFT_PIN))) {
                 button_handler(LEFT_PIN, elm327_previous_command);
@@ -77,22 +76,24 @@ int main(void) {
         }
 
         elm327_update_data();
+        if (elm327_has_data()) {
+            wdt_reset();
+            // Setup USI for TWI communication
+            lcd_usi_initialise();
 
-        // Setup USI for TWI communication
-        lcd_usi_initialise();
+            lcd_move(0x00);
+            lcd_print_ptr(elm327_get_prefix());
+            lcd_print_cstring(elm327_get_data());
+            lcd_print_ptr(elm327_get_suffix());
+            lcd_print_padding(6);
 
-        lcd_move(0x00);
-        lcd_print_ptr(elm327_get_prefix());
-        lcd_print_cstring(elm327_get_data());
-        lcd_print_ptr(elm327_get_suffix());
-        lcd_print_padding(6);
+            lcd_move(0x40);
+            lcd_print_ptr(elm327_get_stored_prefix());
+            lcd_print_cstring(elm327_get_stored_data());
+            lcd_print_ptr(elm327_get_suffix());
+            lcd_print_padding(6);
+        } 
 
-        lcd_move(0x40);
-        lcd_print_ptr(elm327_get_stored_prefix());
-        lcd_print_cstring(elm327_get_stored_data());
-        lcd_print_ptr(elm327_get_suffix());
-        lcd_print_padding(6);
-   
         // Delay for any remaining time in the case that a button press broke the prior loop early 
         while (delay_ms < DELAY_MS) {
             delay_ms++;

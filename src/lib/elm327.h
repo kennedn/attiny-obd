@@ -13,6 +13,7 @@ char* elm327_get_data(void);
 char* elm327_get_stored_data(void);
 void elm327_send_alt_command(void);
 unsigned char elm327_has_alt(void);
+unsigned char elm327_has_data(void);
 void elm327_next_command(void);
 void elm327_previous_command(void);
 

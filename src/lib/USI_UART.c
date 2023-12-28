@@ -179,18 +179,29 @@ unsigned char USI_UART_Receive_Byte(void) {
     return Bit_Reverse(UART_RxBuf[tmptail]);            // Reverse the order of the bits in the data byte before it returns data from the buffer.
 }
 
+unsigned char USI_UART_Is_Hex(unsigned char c) {
+    return ((c >= '0' && c <= '9') ||
+            (c >= 'A' && c <= 'F') ||
+            (c >= 'a' && c <= 'f'));
+}
+
 // Copies `n` bytes from the UART receive circular buffer to a destination buffer as a null terminated char array.
 // @param buff Pointer to a destination buffer.
 // @param n Number of bytes to be extracted.
-void USI_UART_Copy_Receive_Buffer(char *buff, unsigned char n) {
+// @return 0 if non-hexidecimal character detected, 1 otherwise
+unsigned char USI_UART_Copy_Receive_Buffer(char *buff, unsigned char n) {
     do {
         unsigned char buff_index = (UART_RxHead + UART_RX_BUFFER_SIZE - n) & UART_RX_BUFFER_MASK;
         unsigned char c = Bit_Reverse(UART_RxBuf[buff_index]);
         if (c != '\r' && c != ' ') {
+            if (!USI_UART_Is_Hex(c)) {
+                return 0;
+            }
             *(buff++) = c;
         }
     } while (--n);
     *buff = '\0';  // Null terminate
+    return 1;
 }
 
 // Check if there is data in the receive buffer.

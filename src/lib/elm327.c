@@ -13,16 +13,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define EEPROM_MAX_BASE 0x0
-#define EEPROM_CONFIG 0xFF
 #define ELM327_COMMAND_COUNT 5
-#define ELM327_RECEIVE_TIMEOUT WDTO_250MS
 
 char elm327_response_buffer[UART_RX_BUFFER_SIZE];
 
 long elm327_unit_temp(long);
 long elm327_unit_percent(long);
-long elm327_unit_div10(long);
 
 char elm327_comp_max(long, long);
 char elm327_comp_min(long, long);
@@ -51,7 +47,7 @@ typedef struct ELM327_Command{
 
 ELM327_Command elm327_commands[] = {
     {
-        .command = storage_command_0,
+        .command = storage_command_0,                   // Coolant Temp
         .prefix = storage_prefix_0,
         .suffix = storage_suffix_0,
         .stored_prefix = storage_stored_prefix_0,
@@ -62,7 +58,7 @@ ELM327_Command elm327_commands[] = {
         .comp_func = elm327_comp_max
     },
     {
-        .command = storage_command_1,
+        .command = storage_command_1,                   // Fuel level
         .prefix = storage_prefix_1,
         .suffix = storage_suffix_1,
         .stored_prefix = storage_stored_prefix_1,
@@ -73,7 +69,7 @@ ELM327_Command elm327_commands[] = {
         .comp_func = elm327_comp_min
     },
     {
-        .command = storage_command_2,
+        .command = storage_command_2,                   // Speed
         .prefix = storage_prefix_2,
         .suffix = storage_suffix_2,
         .stored_prefix = storage_stored_prefix_0,
@@ -84,7 +80,7 @@ ELM327_Command elm327_commands[] = {
         .comp_func = elm327_comp_max
     },
     {
-        .command = storage_command_3,
+        .command = storage_command_3,                   // DTC
         .prefix = storage_prefix_3,
         .suffix = storage_suffix_3,
         .stored_prefix = storage_stored_prefix_2,
@@ -95,14 +91,14 @@ ELM327_Command elm327_commands[] = {
         .comp_func = elm327_comp_last
     },
     {
-        .command = storage_command_4,
+        .command = storage_command_4,                   // Engine load
         .prefix = storage_prefix_4,
-        .suffix = storage_suffix_4,
+        .suffix = storage_suffix_1,
         .stored_prefix = storage_stored_prefix_0,
-        .chars = 5,
+        .chars = 2,
         .default_data = 0,
         .print_func = elm327_print_long,
-        .unit_func = elm327_unit_div10,
+        .unit_func = elm327_unit_percent,
         .comp_func = elm327_comp_max
     }
 };
@@ -137,8 +133,8 @@ void elm327_deactivate(void)  {
 }
 // Copies n response chars as a cstring into the elm327 response buffer
 // @param n Number of chars to retrieve
-void elm327_retrieve_cstring(unsigned char n) {
-    USI_UART_Copy_Receive_Buffer(elm327_response_buffer, n);
+unsigned char elm327_retrieve_cstring(unsigned char n) {
+    return USI_UART_Copy_Receive_Buffer(elm327_response_buffer, n);
 }
 
 long elm327_unit_temp(long x) {
@@ -150,15 +146,6 @@ long elm327_unit_temp(long x) {
 // Shift by 2^8 (256) to approximate division by 255
 long elm327_unit_percent(long x) {
     return (long)((x * 100 + 128) >> 8);
-}
-
-// Use fixed point arithmetic to divide by 10
-// Each unit is scaled by 6554 = (2^16) / 10
-// Rounding is achieved by offsetting the value by half the scale (2^15)
-// Shift by scale to get divided value
-long elm327_unit_div10(long x) {
-    long ret = (x * 6554) + (1 << 15);
-    return ret >> 16;
 }
 
 char elm327_comp_max(long d1, long d2) {
@@ -200,7 +187,11 @@ void elm327_update_data() {
     // e1 \r\r
     // Spaces and CRs are stripped so the function actually returns:
     // e1
-    elm327_retrieve_cstring(elm327_commands[elm327_idx].chars + 3);
+    if (!elm327_retrieve_cstring(elm327_commands[elm327_idx].chars + 3)) {
+        elm327_data = 0xFFFFFFFF;
+        elm327_deactivate();
+        return; // Return early if non hex characters were detected in data
+    }
     long raw_data = strtol(elm327_response_buffer, NULL, 16);
 
     long data;
@@ -249,6 +240,10 @@ unsigned char elm327_has_alt(void) {
     return elm327_idx == 3;
 }
 
+unsigned char elm327_has_data(void) {
+    return elm327_data != 0xFFFFFFFF;
+}
+
 void elm327_send_alt_command(void) {
     elm327_usi_initalise();
     elm327_send_command_and_wait(storage_alt_command_0);
@@ -257,7 +252,7 @@ void elm327_send_alt_command(void) {
 
 void elm327_setup_data(void) {
     // Ensure residual bits will be zero 
-    elm327_data = 0;
+    elm327_data = 0xFFFFFFFF;
     elm327_stored_data = 0;
 
     // Stored slot data starts at idx 1

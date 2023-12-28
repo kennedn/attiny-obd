@@ -61,7 +61,7 @@ size: ${BUILD_DIR}/${BIN}.elf
 	avr-size --format=avr --mcu=${MCU} $<
 
 simulate:
-	./tools/elm327_mimic.py
+	./tools/elm327_mimic.py ${ARGS}
 
 ${BUILD_DIRS}:
 	@mkdir -p $@

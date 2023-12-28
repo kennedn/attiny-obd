@@ -4,21 +4,14 @@ import serial
 import logging
 import random
 from time import time
+import argparse
 import RPi.GPIO as GPIO
 
-
-port = '/dev/ttyAMA0'
-baudrate = 38400
-target = random.randint(0, 0xFF)
-data = target
-target2 = random.randint(0, 0xFF)
-data2 = target
-last_run_ms = 0
-curr_ms = 0
-wait_ms = 0
+targets = []
+byte_count = 1
 
 logging.basicConfig(
-        format='%(asctime)s.%(msecs)03d [%(target)s (%(target_hex)s)] %(message)s',
+        format='%(asctime)s.%(msecs)03d [%(targets)s %(targets_hex)s] %(message)s',
     level=logging.INFO,
     datefmt='%Y-%m-%d %H:%M:%S')
 
@@ -26,14 +19,13 @@ old_factory = logging.getLogRecordFactory()
 
 def record_factory(*args, **kwargs):
     record = old_factory(*args, **kwargs)
-    record.target = target
-    record.target_hex = '0x{:02x}'.format(target)
+    record.targets = ','.join([f'{targets[x]}' for x in range(byte_count)])
+    record.targets_hex = ','.join([f'0x{targets[x]:02x}' for x in range(byte_count)])
     return record
 
 logging.setLogRecordFactory(record_factory)
 
-def move_data_towards_target(data):
-    global target
+def move_data_towards_target(data, target):
     if data == target:
         target = random.randint(0,0xFF)
 
@@ -41,46 +33,74 @@ def move_data_towards_target(data):
         data += 1
     else:
         data -= 1
-    return data
+    return data, target
 
-# def format_data(data, n):
-    # masked_data_string = f'{data & ((1 <<(n*8))-1):0{n*2}x}'
-    # format_data_string = ' '.join(masked_data_string[i:i+2] for i in range(0, len(masked_data_string), 2))
-    # return format_data_string
+def format_data(datas, bytes):
+    s = ''
+    for x in range(bytes):
+        s += f'{datas[x]:02x} '
+    return s
 
-with serial.Serial(port,baudrate) as ser:
-    # Toggle RESET pin on attiny
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(22, GPIO.OUT)
-    GPIO.output(22, GPIO.LOW)
-    GPIO.output(22, GPIO.HIGH)
-    while True:
-        s = ''
+def main():
+    parser = argparse.ArgumentParser(description="Simulate an ELM327 connected to a car")
+    parser.add_argument("-p", "--port", default='/dev/ttyAMA0', help="Set serial port")
+    parser.add_argument("-b", "--baudrate", type=int, default=38400, help="Set baudrate")
+    parser.add_argument("-d", "--disconnected", action="store_true", help="Respond as if the car is disconnected")
+    args = parser.parse_args()
+
+    last_run_ms = 0
+    curr_ms = 0
+    wait_ms = 0
+
+    max_data_bytes = 4
+    extra_data_pids = {
+        "0102": 2,
+        "0110": 2,
+    }
+
+    global targets
+    global byte_count
+    for i in range(max_data_bytes):
+        targets.append(random.randint(0, 0xFF))
+    datas = targets[:]
+
+    with serial.Serial(args.port,args.baudrate) as ser:
+        # Toggle RESET pin on attiny
+        GPIO.setwarnings(False)
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(22, GPIO.OUT)
+        GPIO.output(22, GPIO.LOW)
+        GPIO.output(22, GPIO.HIGH)
         while True:
-                s += ser.read().decode()
-                if s[-1] == '\r': break
+            s = ''
+            while True:
+                    s += ser.read().decode()
+                    if s[-1] == '\r': break
 
-        logging.info("< {}".format(s.replace('\r','\\r')))
-        command = b''
-        curr_ms = time() * 1000
-        # We can safely skip configuration commands in our sim (AT*)
-        if s.startswith('AT'):
-            command = b'>'
-        else:
-            # Pick a random amount of time to wait between data changes
-            if curr_ms - last_run_ms >= wait_ms:
-                last_run_ms = time() * 1000
-                wait_ms = random.randint(100,3000)
-                data = move_data_towards_target(data)
-                data2 = move_data_towards_target(data2)
-            if s.startswith('0102') or s.startswith('0110'):
-                # Set command to a mock elm327 response which includes the data
-                command = '7E8 03 41 02 41 {:02x} {:02x} \r\r>'.format(data, data2).encode()
+            logging.info("< {}".format(s.replace('\r','\\r')))
+            command = b''
+            curr_ms = time() * 1000
+            # We can safely skip configuration commands in our sim (AT*)
+            if s.startswith('AT'):
+                command = b'>'
             else:
-                # Set command to a mock elm327 response which includes the data
-                command = '7E8 03 41 05 {:02x} \r\r>'.format(data).encode()
-        logging.info("> {}".format(command.decode().replace('\r','\\r')))
-        # Reply to device with command    
-        ser.write(command)
+                byte_count = extra_data_pids.get(s[0:4], 1)
+                # Pick a random amount of time to wait between data changes
+                if curr_ms - last_run_ms >= wait_ms:
+                    last_run_ms = time() * 1000
+                    wait_ms = random.randint(100,3000)
+                    for x in range(byte_count):
+                        datas[x], targets[x] = move_data_towards_target(datas[x],targets[x])
+
+                if args.disconnected:
+                    command = 'NO DATA \r\r>'.encode()
+                else: 
+                    command = '7E8 03 4{:s} {:s} {:s}\r\r>'.format(s[1], s[2:4], format_data(datas, byte_count)).encode()
+
+            logging.info("> {}".format(command.decode().replace('\r','\\r')))
+            # Reply to device with command    
+            ser.write(command)
+
+if __name__ == "__main__":
+    main()
 

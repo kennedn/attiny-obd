@@ -8,6 +8,9 @@
 extern const char storage_alt_command_0[] PROGMEM;
 extern const char storage_alt_string_0[] PROGMEM;
 
+
+extern const char storage_no_data[] PROGMEM;
+
 extern const char storage_command_a[] PROGMEM;
 extern const char storage_command_b[] PROGMEM;
 extern const char storage_command_c[] PROGMEM;
@@ -28,7 +31,6 @@ extern const char storage_suffix_0[] PROGMEM;
 extern const char storage_suffix_1[] PROGMEM;
 extern const char storage_suffix_2[] PROGMEM;
 extern const char storage_suffix_3[] PROGMEM;
-extern const char storage_suffix_4[] PROGMEM;
 
 extern const char storage_stored_prefix_0[] PROGMEM;
 extern const char storage_stored_prefix_1[] PROGMEM;
