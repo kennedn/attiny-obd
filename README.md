@@ -1,4 +1,4 @@
-# avr-obd
+# attiny-obd
 
 Display OBD statistics on a 16x2 LCD display using an attiny85.
 
